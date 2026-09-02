@@ -1,0 +1,17 @@
+<!doctype html><meta charset="utf-8"><title>semgrep wasm smoke</title>
+<pre id="out">starting…</pre>
+<script type="module">
+const out = document.getElementById('out');
+const log = (m) => { out.textContent += '\n' + m; };
+const w = new Worker('./smoke-worker.js', { type: 'module' });
+const t0 = performance.now();
+w.onmessage = (e) => {
+  const d = e.data;
+  if (d.type === 'log') log(d.msg);
+  else if (d.type === 'result') log(`RESULT ${d.name}: lines=${JSON.stringify(d.lines)} errors=${JSON.stringify(d.errors)} ${d.ms}ms`);
+  else if (d.type === 'done') { log(`DONE in ${Math.round(performance.now() - t0)}ms`); document.title = 'DONE'; }
+  else if (d.type === 'fatal') { log('FATAL ' + d.msg); document.title = 'FATAL'; }
+};
+w.onerror = (e) => { log('WORKER ERROR ' + e.message); document.title = 'FATAL'; };
+w.postMessage({ type: 'start' });
+</script>

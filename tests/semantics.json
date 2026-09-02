@@ -1,0 +1,911 @@
+[
+ {
+  "name": "plain-call-string",
+  "rule": {
+   "pattern": "Console.WriteLine(\"...\")"
+  },
+  "expect": [
+   14,
+   15,
+   16,
+   21
+  ]
+ },
+ {
+  "name": "plain-literal-only",
+  "rule": {
+   "pattern": "Console.WriteLine(\"hello\")"
+  },
+  "expect": [
+   14
+  ]
+ },
+ {
+  "name": "interpolated-only",
+  "rule": {
+   "pattern": "Console.WriteLine($\"...\")"
+  },
+  "expect": [
+   16
+  ]
+ },
+ {
+  "name": "constprop-off",
+  "rule": {
+   "pattern": "Console.WriteLine(\"...\")",
+   "options": {
+    "constant_propagation": false
+   }
+  },
+  "expect": [
+   14,
+   16,
+   21
+  ]
+ },
+ {
+  "name": "any-depth-in-try",
+  "rule": {
+   "pattern": "Process.Start(...)"
+  },
+  "expect": [
+   18,
+   25
+  ]
+ },
+ {
+  "name": "not-inside-try",
+  "rule": {
+   "patterns": [
+    {
+     "pattern": "Process.Start(...)"
+    },
+    {
+     "pattern-not-inside": "try { ... }"
+    }
+   ]
+  },
+  "expect": [
+   18
+  ]
+ },
+ {
+  "name": "if-header-pitfall",
+  "rule": {
+   "pattern": "if ($C)"
+  },
+  "expect": []
+ },
+ {
+  "name": "if-with-block",
+  "rule": {
+   "pattern": "if ($C) { ... }"
+  },
+  "expect": [
+   19
+  ]
+ },
+ {
+  "name": "ellipsis-descends",
+  "rule": {
+   "pattern": "int $T = 0; ... $T /= 2;"
+  },
+  "expect": [
+   32
+  ]
+ },
+ {
+  "name": "assign-vs-decl",
+  "rule": {
+   "pattern": "$X = DateTime.Now;"
+  },
+  "expect": []
+ },
+ {
+  "name": "var-decl",
+  "rule": {
+   "pattern": "var $X = DateTime.Now;"
+  },
+  "expect": [
+   31
+  ]
+ },
+ {
+  "name": "metavar-regex-secret",
+  "rule": {
+   "patterns": [
+    {
+     "pattern": "private const string $N = $V;"
+    },
+    {
+     "metavariable-regex": {
+      "metavariable": "$V",
+      "regex": "^\"[0-9a-f]{32,}\"$"
+     }
+    }
+   ]
+  },
+  "expect": [
+   9
+  ]
+ },
+ {
+  "name": "metavar-pattern-generic",
+  "rule": {
+   "patterns": [
+    {
+     "pattern": "new SqlCommand($Q)"
+    },
+    {
+     "metavariable-pattern": {
+      "metavariable": "$Q",
+      "language": "generic",
+      "pattern": "SELECT"
+     }
+    }
+   ]
+  },
+  "expect": [
+   17
+  ]
+ },
+ {
+  "name": "metavar-comparison",
+  "rule": {
+   "patterns": [
+    {
+     "pattern": "$T /= $N;"
+    },
+    {
+     "metavariable-comparison": {
+      "metavariable": "$N",
+      "comparison": "$N > 1"
+     }
+    }
+   ]
+  },
+  "expect": [
+   34
+  ]
+ },
+ {
+  "name": "focus-metavariable",
+  "rule": {
+   "patterns": [
+    {
+     "pattern": "Process.Start($A)"
+    },
+    {
+     "focus-metavariable": "$A"
+    }
+   ]
+  },
+  "expect": [
+   18
+  ]
+ },
+ {
+  "name": "deep-expression",
+  "rule": {
+   "pattern": "Foo(<... $S.ToLower() ...>)"
+  },
+  "expect": [
+   39,
+   40
+  ]
+ },
+ {
+  "name": "typed-metavar",
+  "rule": {
+   "pattern": "Foo((string $S).ToLower())"
+  },
+  "expect": [
+   39
+  ]
+ },
+ {
+  "name": "method-def-modifiers",
+  "rule": {
+   "pattern": "public static $T $F(...) { ... }"
+  },
+  "expect": [
+   12
+  ]
+ },
+ {
+  "name": "catch-rethrow-fix",
+  "rule": {
+   "pattern": "catch ($T $E) { ... throw $E; }",
+   "fix": "catch ($T $E) { throw; }"
+  },
+  "expect": [
+   27
+  ],
+  "checkFix": true
+ },
+ {
+  "name": "fix-simple",
+  "rule": {
+   "pattern": "DateTime.Now",
+   "fix": "DateTime.UtcNow"
+  },
+  "expect": [
+   31
+  ],
+  "checkFix": true
+ },
+ {
+  "name": "fix-regex",
+  "rule": {
+   "pattern": "$S.ToLower()",
+   "fix-regex": {
+    "regex": "ToLower\\(\\)",
+    "replacement": "ToLowerInvariant()"
+   }
+  },
+  "expect": [
+   39,
+   40
+  ],
+  "checkFix": true
+ },
+ {
+  "name": "pattern-regex",
+  "rule": {
+   "pattern-regex": "throw ex;"
+  },
+  "expect": [
+   29
+  ]
+ },
+ {
+  "name": "pattern-not-regex",
+  "rule": {
+   "patterns": [
+    {
+     "pattern": "Console.WriteLine(...)"
+    },
+    {
+     "pattern-not-regex": "hello"
+    }
+   ]
+  },
+  "expect": [
+   16,
+   21
+  ]
+ },
+ {
+  "name": "metavar-analysis-entropy",
+  "rule": {
+   "patterns": [
+    {
+     "pattern": "private const string $N = $V;"
+    },
+    {
+     "metavariable-analysis": {
+      "metavariable": "$V",
+      "analyzer": "entropy"
+     }
+    }
+   ]
+  },
+  "expect": [
+   9
+  ]
+ },
+ {
+  "name": "taint-basic",
+  "rule": {
+   "mode": "taint",
+   "pattern-sources": [
+    {
+     "patterns": [
+      {
+       "pattern-inside": "public static void Run(string $P, ...) { ... }"
+      },
+      {
+       "focus-metavariable": "$P"
+      }
+     ]
+    }
+   ],
+   "pattern-sinks": [
+    {
+     "pattern": "Process.Start(...)"
+    }
+   ]
+  },
+  "expect": [
+   18,
+   25
+  ]
+ },
+ {
+  "name": "taint-sanitizer",
+  "rule": {
+   "mode": "taint",
+   "pattern-sources": [
+    {
+     "pattern": "$S.ToLower()"
+    }
+   ],
+   "pattern-sanitizers": [
+    {
+     "pattern": "Clean(...)"
+    }
+   ],
+   "pattern-sinks": [
+    {
+     "pattern": "Foo(...)"
+    }
+   ]
+  },
+  "expect": [
+   39
+  ]
+ },
+ {
+  "name": "taint-propagator",
+  "rule": {
+   "mode": "taint",
+   "pattern-sources": [
+    {
+     "pattern": "input"
+    }
+   ],
+   "pattern-propagators": [
+    {
+     "pattern": "$CMD = new SqlCommand($X)",
+     "from": "$X",
+     "to": "$CMD"
+    }
+   ],
+   "pattern-sinks": [
+    {
+     "pattern": "Process.Start(...)"
+    }
+   ]
+  },
+  "expect": [
+   18,
+   25
+  ]
+ },
+ {
+  "name": "taint-by-side-effect-key",
+  "rule": {
+   "mode": "taint",
+   "pattern-sources": [
+    {
+     "pattern": "input",
+     "by-side-effect": true
+    }
+   ],
+   "pattern-sinks": [
+    {
+     "pattern": "Process.Start(...)"
+    }
+   ]
+  },
+  "expect": [
+   18,
+   25
+  ]
+ },
+ {
+  "name": "taint-unify-mvars",
+  "rule": {
+   "mode": "taint",
+   "options": {
+    "taint_unify_mvars": true
+   },
+   "pattern-sources": [
+    {
+     "pattern": "$X.ToLower()"
+    }
+   ],
+   "pattern-sinks": [
+    {
+     "pattern": "Foo($X)"
+    }
+   ]
+  },
+  "expect": []
+ },
+ {
+  "name": "ellipsis-metavar-args",
+  "rule": {
+   "pattern": "Process.Start($...ARGS)"
+  },
+  "expect": [
+   18,
+   25
+  ],
+  "showMetavars": true
+ },
+ {
+  "name": "anonymous-metavar",
+  "rule": {
+   "pattern": "Foo($_)"
+  },
+  "expect": [
+   39,
+   40
+  ]
+ },
+ {
+  "name": "attribute-less-method",
+  "rule": {
+   "pattern": "$T $F(string $S) { ... }"
+  },
+  "expect": [
+   37,
+   43,
+   44
+  ]
+ },
+ {
+  "name": "class-def",
+  "rule": {
+   "pattern": "class $C { ... }"
+  },
+  "expect": [
+   7
+  ]
+ },
+ {
+  "name": "using-import",
+  "rule": {
+   "pattern": "using System.Diagnostics;"
+  },
+  "expect": [
+   2
+  ]
+ },
+ {
+  "name": "severity-high-legacy?",
+  "rule": {
+   "pattern": "DateTime.Now",
+   "severity": "HIGH"
+  },
+  "expect": [
+   31
+  ]
+ },
+ {
+  "name": "min-version-key",
+  "rule": {
+   "pattern": "DateTime.Now",
+   "min-version": "1.50.0"
+  },
+  "expect": [
+   31
+  ]
+ },
+ {
+  "name": "paths-exclude",
+  "rule": {
+   "pattern": "DateTime.Now",
+   "paths": {
+    "exclude": [
+     "Demo/**"
+    ]
+   }
+  },
+  "expect": []
+ },
+ {
+  "name": "metavariable-type-key",
+  "rule": {
+   "patterns": [
+    {
+     "pattern": "Foo($S)"
+    },
+    {
+     "metavariable-type": {
+      "metavariable": "$S",
+      "type": "string"
+     }
+    }
+   ]
+  },
+  "expect": [
+   39,
+   40
+  ]
+ },
+ {
+  "name": "bad-pattern-error",
+  "rule": {
+   "pattern": "Foo("
+  },
+  "expectError": true
+ },
+ {
+  "name": "unknown-key-error",
+  "rule": {
+   "pattern": "DateTime.Now",
+   "bogus-key": 1
+  },
+  "expectError": true
+ },
+ {
+  "name": "v-mvregex-ident",
+  "rule": {
+   "patterns": [
+    {
+     "pattern": "private const string $N = $V;"
+    },
+    {
+     "metavariable-regex": {
+      "metavariable": "$N",
+      "regex": "^Token"
+     }
+    }
+   ]
+  },
+  "expect": [
+   9
+  ]
+ },
+ {
+  "name": "v-mvregex-str-noquote",
+  "rule": {
+   "patterns": [
+    {
+     "pattern": "private const string $N = $V;"
+    },
+    {
+     "metavariable-regex": {
+      "metavariable": "$V",
+      "regex": "f449"
+     }
+    }
+   ]
+  },
+  "expect": [
+   9
+  ]
+ },
+ {
+  "name": "v-mvregex-str-quote",
+  "rule": {
+   "patterns": [
+    {
+     "pattern": "private const string $N = $V;"
+    },
+    {
+     "metavariable-regex": {
+      "metavariable": "$V",
+      "regex": "^\"f449"
+     }
+    }
+   ]
+  },
+  "expect": [
+   9
+  ]
+ },
+ {
+  "name": "v-mvregex-none",
+  "rule": {
+   "patterns": [
+    {
+     "pattern": "private const string $N = $V;"
+    },
+    {
+     "metavariable-regex": {
+      "metavariable": "$V",
+      "regex": "zzz"
+     }
+    }
+   ]
+  },
+  "expect": []
+ },
+ {
+  "name": "v-mvregex-strlit-pattern",
+  "rule": {
+   "patterns": [
+    {
+     "pattern": "private const string $N = \"...\";"
+    },
+    {
+     "metavariable-regex": {
+      "metavariable": "$N",
+      "regex": "Secret"
+     }
+    }
+   ]
+  },
+  "expect": [
+   9
+  ]
+ },
+ {
+  "name": "v-regex-simple",
+  "rule": {
+   "pattern-regex": "hello"
+  },
+  "expect": [
+   14,
+   15
+  ]
+ },
+ {
+  "name": "v-regex-in-patterns",
+  "rule": {
+   "patterns": [
+    {
+     "pattern": "Console.WriteLine(...)"
+    },
+    {
+     "pattern-regex": "hello"
+    }
+   ]
+  },
+  "expect": [
+   14,
+   15
+  ]
+ },
+ {
+  "name": "v-notregex-in-patterns",
+  "rule": {
+   "patterns": [
+    {
+     "pattern": "Console.WriteLine(...)"
+    },
+    {
+     "pattern-not-regex": "hello"
+    }
+   ]
+  },
+  "expect": [
+   16,
+   21
+  ]
+ },
+ {
+  "name": "v-notinside-trycatch",
+  "rule": {
+   "patterns": [
+    {
+     "pattern": "Process.Start(...)"
+    },
+    {
+     "pattern-not-inside": "try { ... } catch (...) { ... }"
+    }
+   ]
+  },
+  "expect": [
+   18
+  ]
+ },
+ {
+  "name": "v-notinside-trycatch2",
+  "rule": {
+   "patterns": [
+    {
+     "pattern": "Process.Start(...)"
+    },
+    {
+     "pattern-not-inside": "try { ... } catch ($T $E) { ... }"
+    }
+   ]
+  },
+  "expect": [
+   18
+  ]
+ },
+ {
+  "name": "v-inside-if",
+  "rule": {
+   "patterns": [
+    {
+     "pattern": "Console.WriteLine(...)"
+    },
+    {
+     "pattern-inside": "if ($C) { ... }"
+    }
+   ]
+  },
+  "expect": [
+   21
+  ]
+ },
+ {
+  "name": "v-inside-method",
+  "rule": {
+   "patterns": [
+    {
+     "pattern": "Foo(...)"
+    },
+    {
+     "pattern-inside": "public void Helper(...) { ... }"
+    }
+   ]
+  },
+  "expect": [
+   39,
+   40
+  ]
+ },
+ {
+  "name": "v-catch-full",
+  "rule": {
+   "pattern": "try { ... } catch ($T $E) { ... throw $E; }"
+  },
+  "expect": [
+   23
+  ]
+ },
+ {
+  "name": "v-catch-full2",
+  "rule": {
+   "pattern": "try { ... } catch ($T $E) { throw $E; }"
+  },
+  "expect": [
+   23
+  ]
+ },
+ {
+  "name": "v-catch-only",
+  "rule": {
+   "pattern": "catch ($T $E) { throw $E; }"
+  },
+  "expect": [
+   27
+  ]
+ },
+ {
+  "name": "v-throw-ex-stmt",
+  "rule": {
+   "patterns": [
+    {
+     "pattern": "throw $E;"
+    },
+    {
+     "pattern-inside": "catch ($T $E) { ... }"
+    }
+   ]
+  },
+  "expect": [
+   29
+  ]
+ },
+ {
+  "name": "v-either",
+  "rule": {
+   "pattern-either": [
+    {
+     "pattern": "DateTime.Now"
+    },
+    {
+     "pattern": "Process.Start(...)"
+    }
+   ]
+  },
+  "expect": [
+   18,
+   25,
+   31
+  ]
+ },
+ {
+  "name": "v-not",
+  "rule": {
+   "patterns": [
+    {
+     "pattern": "Console.WriteLine(...)"
+    },
+    {
+     "pattern-not": "Console.WriteLine(\"hello\")"
+    }
+   ]
+  },
+  "expect": [
+   15,
+   16,
+   21
+  ]
+ },
+ {
+  "name": "v-string-concat-fold",
+  "rule": {
+   "pattern": "Console.WriteLine(\"hello world\")"
+  },
+  "expect": [
+   15
+  ]
+ },
+ {
+  "name": "v-named-args",
+  "rule": {
+   "pattern": "new SqlCommand($X)",
+   "target": null
+  },
+  "expect": [
+   17
+  ]
+ },
+ {
+  "name": "v-attr",
+  "rule": {
+   "pattern": "[$A] $T $M(...) { ... }"
+  },
+  "expect": []
+ },
+ {
+  "name": "v-method-chain",
+  "rule": {
+   "pattern": "$X.ToLower(). ... .Trim()"
+  },
+  "expect": []
+ },
+ {
+  "name": "v-badpattern-dump",
+  "rule": {
+   "pattern": "Foo("
+  },
+  "expect": []
+ },
+ {
+  "name": "v-fix-dump",
+  "rule": {
+   "pattern": "DateTime.Now",
+   "fix": "DateTime.UtcNow"
+  },
+  "expect": [
+   31
+  ]
+ },
+ {
+  "name": "v-regex-anchored-start",
+  "rule": {
+   "pattern-regex": "^using"
+  },
+  "expect": [
+   1,
+   2,
+   3
+  ]
+ },
+ {
+  "name": "v-mvregex-empty",
+  "rule": {
+   "patterns": [
+    {
+     "pattern": "private const string $N = $V;"
+    },
+    {
+     "metavariable-regex": {
+      "metavariable": "$V",
+      "regex": "^$"
+     }
+    }
+   ]
+  },
+  "expect": []
+ },
+ {
+  "name": "v-mvregex-on-name-none",
+  "rule": {
+   "patterns": [
+    {
+     "pattern": "$T $F(string $S) { ... }"
+    },
+    {
+     "metavariable-regex": {
+      "metavariable": "$F",
+      "regex": "^Foo$"
+     }
+    }
+   ]
+  },
+  "expect": [
+   43
+  ]
+ }
+]
