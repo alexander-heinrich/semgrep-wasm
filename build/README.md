@@ -8,9 +8,11 @@ to another machine.
 ```sh
 sh scripts/rebuild-engine/build.sh              # → scripts/rebuild-engine/out/{engine,csharp,python}/ (gitignored)
 sh scripts/rebuild-engine/install.sh [1.81.0]   # → docs/vendor/semgrep/*.{mjs,cjs,wasm} + SHA256SUMS
-node scripts/semantics_check.mjs                # 67 pattern-semantics checks
+node scripts/semantics_check.mjs                # 67 pattern-semantics checks (stored expectations)
+python3 scripts/engine_probes.py                # 60 probes vs semgrep and opengrep (no expectations)
 node scripts/wasm_parity.mjs                    # every challenge through the new build
 node scripts/browser-test.mjs --all             # headless Chrome, end to end
+node scripts/network_check.mjs                  # no request leaves the local origin
 ```
 
 Requirements: Docker (Colima works), about 15 GB of image space, and roughly 15 minutes.
@@ -161,9 +163,12 @@ Reference is Semgrep 1.172.0, invoked by `scripts/build.py` on every challenge.
 | `scripts/wasm_parity.mjs` | 33/33, no challenge left CLI-only |
 | `scripts/semantics_check.mjs` | 67/67 |
 | `scripts/browser-test.mjs --all` | 332 checks |
-| 31 rule-key probes | identical to the CLI, including error cases |
-| 29 C# 9–14 syntax probes | identical, including the same partial-parse errors |
-| network check (DevTools protocol) | 19 requests during a full run, all to the local origin, none external |
+| 31 rule-key probes (`scripts/engine_probes.py rules`) | identical to the CLI, including error cases |
+| 29 C# 9–14 syntax probes (`scripts/engine_probes.py syntax`) | identical, including the same partial-parse errors |
+| network check (`scripts/network_check.mjs`) | 19 requests during a full run, all to the local origin, none external |
+
+Recorded probe output is committed as `spike/probe-results.jsonl`; regenerate with
+`python3 scripts/engine_probes.py all --emit spike/probe-results.jsonl`.
 
 Ten expectations in the semantics suite turned out to describe Semgrep behaviour that had never been
 verified against the CLI. They were re-derived from the CLI and corrected; the engine had been right.
