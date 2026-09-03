@@ -1,11 +1,14 @@
-# Vendored Semgrep WASM builds
+# Vendored Semgrep WASM build
 
-| file | npm package | published | license |
-|---|---|---|---|
-| engine-1.17.1-alpha.2.mjs | @semgrep/engine@1.17.1-alpha.2 (dist/index.mjs) | 2023-04-10 | LGPL-2.1 |
-| csharp-1.17.1-alpha.0.mjs | @semgrep/languages@1.17.1-alpha.0 (dist/csharp/index.mjs) | 2023-04-10 | LGPL-2.1 |
-| python-0.0.4.mjs + semgrep-parser.wasm | @semgrep/lang-python@0.0.4 (dist/index.mjs, dist/semgrep-parser.wasm) | 2023-04-23 | LGPL-2.1 |
+Built from https://github.com/semgrep/semgrep at tag v1.81.0 (2024-07-24) with `scripts/rebuild-engine/`
+(OCaml 4.14.0 / js_of_ocaml 5.7.2 / emscripten 3.1.51; opam-repository snapshot 4f54a686 from the same day).
 
-Files are unmodified copies from the npm registry (via cdn.jsdelivr.net); checksums in SHA256SUMS.
-Source: https://github.com/semgrep/semgrep (the `js/` directory at tag v1.17.1 / v1.18.0; removed from `develop` after v1.81.0).
-See spike/RESULTS.md for why these exact versions and what glue is required.
+| file | upstream target | license |
+|---|---|---|
+| engine-1.81.0.mjs / .cjs | js/engine dist/index.mjs, dist/index.cjs (libpcre, libpcre2, libyaml inlined as wasm) | LGPL-2.1 |
+| csharp-1.81.0.mjs / .cjs / .wasm | js/languages/csharp dist/index.mjs, dist/index.cjs, dist/semgrep-parser.wasm | LGPL-2.1 |
+| python-1.81.0.mjs / .cjs / .wasm | js/languages/python (same layout) | LGPL-2.1 |
+
+The `.mjs` files and the `.wasm` side-cars are what the site loads; the `.cjs` files are used by the Node
+scripts (`scripts/wasm_parity.mjs`, `scripts/semantics_check.mjs`). Checksums in SHA256SUMS. Build notes and
+the comparison with the current CLI: spike/RESULTS.md.

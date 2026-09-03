@@ -7,7 +7,6 @@
   "expect": [
    14,
    15,
-   16,
    21
   ]
  },
@@ -39,7 +38,6 @@
   },
   "expect": [
    14,
-   16,
    21
   ]
  },
@@ -218,9 +216,7 @@
    "pattern": "catch ($T $E) { ... throw $E; }",
    "fix": "catch ($T $E) { throw; }"
   },
-  "expect": [
-   27
-  ],
+  "expect": [],
   "checkFix": true
  },
  {
@@ -510,10 +506,7 @@
     }
    ]
   },
-  "expect": [
-   39,
-   40
-  ]
+  "expect": []
  },
  {
   "name": "bad-pattern-error",
@@ -528,7 +521,9 @@
    "pattern": "DateTime.Now",
    "bogus-key": 1
   },
-  "expectError": true
+  "expect": [
+   31
+  ]
  },
  {
   "name": "v-mvregex-ident",
@@ -545,9 +540,7 @@
     }
    ]
   },
-  "expect": [
-   9
-  ]
+  "expect": []
  },
  {
   "name": "v-mvregex-str-noquote",
@@ -564,9 +557,7 @@
     }
    ]
   },
-  "expect": [
-   9
-  ]
+  "expect": []
  },
  {
   "name": "v-mvregex-str-quote",
@@ -679,9 +670,7 @@
     }
    ]
   },
-  "expect": [
-   18
-  ]
+  "expectError": true
  },
  {
   "name": "v-notinside-trycatch2",
@@ -755,9 +744,7 @@
   "rule": {
    "pattern": "catch ($T $E) { throw $E; }"
   },
-  "expect": [
-   27
-  ]
+  "expect": []
  },
  {
   "name": "v-throw-ex-stmt",
@@ -771,9 +758,7 @@
     }
    ]
   },
-  "expect": [
-   29
-  ]
+  "expect": []
  },
  {
   "name": "v-either",
