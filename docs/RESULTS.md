@@ -1,4 +1,48 @@
-# Spike results — in-browser Semgrep for C# (2026-09-02)
+# Spike results — in-browser Semgrep for C#
+
+## 2026-09-03: rebuilt from source at v1.81.0 — supersedes the 2023 npm snapshot below
+
+The site now runs an engine we build ourselves from https://github.com/semgrep/semgrep at tag `v1.81.0`
+(2024-07-24), the last tag containing the `js/` build tree (moved to Semgrep's proprietary repository the
+same day; the npm packages stopped in April 2023 and never had a C# parser package). Recipe:
+`scripts/rebuild-engine/` (Dockerfile mirroring the upstream `build-test-javascript` workflow:
+`ocaml/opam:alpine-3.18-ocaml-4.14` + opam-repository snapshot `4f54a686` from the release day with
+`archive-mirrors` pointed at opam.ocaml.org's source cache, `dune build js/engine js/languages/{csharp,python}
+--profile=release`, then `emscripten/emsdk:3.1.51` for libpcre/libpcre2/libyaml/tree-sitter → wasm and esbuild).
+Build time on an M3 with Colima (6 CPUs, 12 GiB, Rosetta for the amd64 emsdk image): ~15 min.
+
+Gotchas: the base image's local opam snapshot is stale (`opam update` re-syncs from `file://`, so pin the
+repository explicitly); two 2024 packages fail checksum verification against today's GitHub archives (fixed by
+the source cache); npm ≥ 7 drops privileges to the owner of the working directory, so `npx esbuild` could
+not write into root-owned `dist/` until the copied tree was `chown`ed; the engine caches parsed targets by
+path, so every run must use a fresh directory (`run-<n>/…`).
+
+API of the v1.81.0 engine: `EngineFactory()` → `addParser(await ParserFactory(wasmUrl))`, `writeFile(path,
+text)`, `execute(lang, rulesFile, root, [targets])` returning Semgrep's CLI JSON (`results[]` with
+`check_id`, `extra.message` interpolated, `extra.fix` rendered), `deleteFile(path)`. Parsers ship a
+`semgrep-parser.wasm` side-car whose URL is passed explicitly. No runtime shim is needed (`ctypes_stubs_js` and
+`integers_stubs_js` are linked). Relative paths resolve against the pseudo-filesystem's `/static/` in the browser,
+so `paths:` globs see the CLI-like target path.
+
+Verification (all against Semgrep 1.172.0 as reference; Opengrep 1.29.0 gives identical answers):
+
+| suite | result |
+|---|---|
+| `scripts/semantics_check.mjs` (67 pattern-semantics checks; ten expectations corrected to the CLI's actual answers) | 67/67 |
+| 31 rule-key probes (regex operators, metavariable-type, severities, paths, min/max-version, focus list, taint options, by-side-effect only, exact, message/fix rendering, …) | 31/31 identical |
+| 29 C# 9–14 syntax samples | identical, incl. the same partial-parse errors on C# 12 primary constructors, `using X = (…)` aliases, `ref readonly` and C# 14 extension members / `a?.b = c` (Opengrep's newer grammar parses all of them) |
+| `scripts/wasm_parity.mjs` (33 challenges) | 33/33, no `cli-only` challenge left |
+| `scripts/browser-test.mjs --all` (headless Chrome) | see the commit that shipped the rebuild |
+
+Every row of the 2023 gap table below is resolved by this build. Rule-side quirks that remain are shared with
+the CLI: `catch (...) { ... }` without `try` matches nothing and `try { ... } catch (...) { ... }` fails to parse,
+`"..."` does not match interpolated strings, unknown top-level keys are ignored (the site warns), and
+`metavariable-type` only resolves types visible in the file.
+
+---
+
+## 2023 npm snapshot (historical)
+
 
 ## Verdict: viable
 
