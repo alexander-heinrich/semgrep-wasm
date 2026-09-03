@@ -29,8 +29,9 @@ Verification (all against Semgrep 1.172.0 as reference; Opengrep 1.29.0 gives id
 | suite | result |
 |---|---|
 | `scripts/semantics_check.mjs` (67 pattern-semantics checks; ten expectations corrected to the CLI's actual answers) | 67/67 |
-| 31 rule-key probes (regex operators, metavariable-type, severities, paths, min/max-version, focus list, taint options, by-side-effect only, exact, message/fix rendering, …) | 31/31 identical |
-| 29 C# 9–14 syntax samples | identical, incl. the same partial-parse errors on C# 12 primary constructors, `using X = (…)` aliases, `ref readonly` and C# 14 extension members / `a?.b = c` (Opengrep's newer grammar parses all of them) |
+| 31 rule-key probes, `scripts/engine_probes.py rules` (regex operators, metavariable-type, severities, paths, min/max-version, focus list, taint options, by-side-effect only, exact, message/fix rendering, …) | 31/31 identical |
+| 29 C# 9–14 syntax samples, `scripts/engine_probes.py syntax` | identical, incl. the same partial-parse errors on C# 12 primary constructors, `using X = (…)` aliases, `ref readonly` and C# 14 extension members / `a?.b = c` (Opengrep's newer grammar parses all of them) |
+| `scripts/network_check.mjs` | 19 requests during a rule run, all local; recorded probe output in `spike/probe-results.jsonl` |
 | `scripts/wasm_parity.mjs` (33 challenges) | 33/33, no `cli-only` challenge left |
 | `scripts/browser-test.mjs --all` (headless Chrome) | see the commit that shipped the rebuild |
 
