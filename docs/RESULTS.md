@@ -5,7 +5,7 @@
 The site now runs an engine we build ourselves from https://github.com/semgrep/semgrep at tag `v1.81.0`
 (2024-07-24), the last tag containing the `js/` build tree (moved to Semgrep's proprietary repository the
 same day; the npm packages stopped in April 2023 and never had a C# parser package). Recipe:
-`scripts/rebuild-engine/` (Dockerfile mirroring the upstream `build-test-javascript` workflow:
+`build/` (Dockerfile mirroring the upstream `build-test-javascript` workflow:
 `ocaml/opam:alpine-3.18-ocaml-4.14` + opam-repository snapshot `4f54a686` from the release day with
 `archive-mirrors` pointed at opam.ocaml.org's source cache, `dune build js/engine js/languages/{csharp,python}
 --profile=release`, then `emscripten/emsdk:3.1.51` for libpcre/libpcre2/libyaml/tree-sitter → wasm and esbuild).
@@ -32,7 +32,7 @@ the rule-syntax results largely transfer to other languages, the parser results 
 | `scripts/semantics_check.mjs` (67 pattern-semantics checks; ten expectations corrected to the CLI's actual answers) | 67/67 |
 | 31 rule-key probes, `scripts/engine_probes.py rules` (regex operators, metavariable-type, severities, paths, min/max-version, focus list, taint options, by-side-effect only, exact, message/fix rendering, …) | 31/31 identical |
 | 29 C# 9–14 syntax samples, `scripts/engine_probes.py syntax` | identical, incl. the same partial-parse errors on C# 12 primary constructors, `using X = (…)` aliases, `ref readonly` and C# 14 extension members / `a?.b = c` (Opengrep's newer grammar parses all of them) |
-| `scripts/network_check.mjs` | 19 requests during a rule run, all local; recorded probe output in `spike/probe-results.jsonl` |
+| `the dojo's network check` | 19 requests during a rule run, all local; recorded probe output in `tests/probe-results.jsonl` |
 | `scripts/wasm_parity.mjs` (33 challenges) | 33/33, no `cli-only` challenge left |
 | `scripts/browser-test.mjs --all` (headless Chrome) | see the commit that shipped the rebuild |
 
@@ -48,7 +48,7 @@ the CLI: `catch (...) { ... }` without `try` matches nothing and `try { ... } ca
 
 ## Verdict: viable
 
-Chosen pair (vendored in `docs/vendor/semgrep/`, checksums in `SHA256SUMS`):
+Chosen pair (now `dist/`, checksums in `SHA256SUMS`):
 
 | component | package | notes |
 |---|---|---|
@@ -116,5 +116,5 @@ Differs / broken → `wasm: cli-only` (or avoid in targets):
 | invalid pattern text (`Foo(`) | may silently match nothing | UI hint when 0 matches and pattern looks unbalanced |
 
 Files: `spike/node-smoke.mjs` (harness), `spike/run-each.py` (one process per check),
-`spike/semantics.json` (checks), `spike/browser-smoke.html` + `smoke-worker.js` (browser),
+`tests/semantics.json` (checks), `spike/browser-smoke.html` + `smoke-worker.js` (browser),
 `spike/cdp-run.mjs` (headless Chrome driver over DevTools protocol).

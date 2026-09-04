@@ -1,11 +1,11 @@
-// Module Web Worker that hosts the Semgrep OSS engine (rebuilt from tag v1.81.0, see scripts/rebuild-engine/)
-// and runs rules on demand.
+// Example module Web Worker that hosts the engine and runs rules on demand. It lives inside dist/ next to the
+// engine files (copy the directory as a whole) and is driven from the main thread with postMessage.
 // Protocol: main → {type:'init'} | {type:'run', id, rules, target, targetPath}
 //           worker → {type:'progress', stage} | {type:'ready', timings} | {type:'fatal', message}
 //                    | {type:'result', id, matches, errors, ms} | {type:'log', message}
 import { normalizeEngineOutput, describeThrown } from './engine-output.js';
 
-const VENDOR = new URL('../vendor/semgrep/', import.meta.url);
+const VENDOR = new URL('./', import.meta.url);
 const ENGINE_URL = new URL('engine-1.81.0.mjs', VENDOR).href;
 const CSHARP_URL = new URL('csharp-1.81.0.mjs', VENDOR).href;
 const CSHARP_WASM_URL = new URL('csharp-1.81.0.wasm', VENDOR).href;

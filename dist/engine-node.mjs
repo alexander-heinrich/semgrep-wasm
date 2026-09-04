@@ -1,14 +1,14 @@
-// Node loader for the vendored browser engine (CommonJS builds rebuilt from semgrep tag v1.81.0).
-// Used by scripts/wasm_parity.mjs and scripts/semantics_check.mjs.
+// Node loader for the browser engine (CommonJS builds rebuilt from semgrep tag v1.81.0).
+// Lives inside dist/ next to the engine files (copy the directory as a whole to embed elsewhere); used by
+// scripts/run_rule.mjs and scripts/semantics_check.mjs.
 import { createRequire } from 'node:module';
 import { mkdirSync, mkdtempSync, rmSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { normalizeEngineOutput, describeThrown } from '../../docs/js/engine-output.js';
+import { normalizeEngineOutput, describeThrown } from './engine-output.js';
 
-export const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
-export const VENDOR = path.join(ROOT, 'docs', 'vendor', 'semgrep');
+export const VENDOR = path.dirname(fileURLToPath(import.meta.url));
 export const FILES = {
   engine: 'engine-1.81.0.cjs',
   csharp: 'csharp-1.81.0.cjs', csharpWasm: 'csharp-1.81.0.wasm',

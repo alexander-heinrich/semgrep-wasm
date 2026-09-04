@@ -1,12 +1,12 @@
 #!/usr/bin/env node
-// Run one rule file against one target through the vendored browser engine and print the result as JSON.
+// Run one rule file against one target through the browser engine (Node build) and print the result as JSON.
 // This is the engine's smallest usable surface: no grading, no challenge data — just rules in, findings out.
 //
 // Usage: node scripts/run_rule.mjs --rule rule.yaml --target file.cs [--target-path Some/Path.cs] [--verbose]
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import yaml from 'js-yaml';
-import { loadEngine } from './lib/engine-node.mjs';
+import { loadEngine } from '../dist/engine-node.mjs';
 
 const args = process.argv.slice(2);
 const argValue = (name) => (args.find((a) => a.startsWith(`${name}=`)) || '').slice(name.length + 1) || (args.includes(name) ? args[args.indexOf(name) + 1] : '');
