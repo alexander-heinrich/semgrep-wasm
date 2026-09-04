@@ -155,7 +155,9 @@ them.
 
 ## Verification
 
-Reference is Semgrep 1.172.0, invoked by `scripts/build.py` on every challenge.
+Reference is Semgrep 1.172.0, invoked by `scripts/build.py` on every challenge. Every suite runs on C#, the only
+language the site exposes: the rule-syntax evidence exercises language-independent engine code and largely
+transfers, the syntax evidence covers the C# grammar and its translation only and transfers to no other language.
 
 | suite | result |
 |---|---|
