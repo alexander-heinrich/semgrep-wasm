@@ -13,7 +13,7 @@ than regression. Two families:
 Usage:
   python3 scripts/engine_probes.py [rules|syntax|all] [--only SUBSTRING] [--emit PATH] [--quiet]
 
-Engines: the vendored browser build (always, via scripts/wasm_parity.mjs), `semgrep` and `opengrep`
+Engines: the vendored browser build (always, via scripts/run_rule.mjs), `semgrep` and `opengrep`
 if they are on PATH. Exits non-zero when the browser engine differs from the reference CLI.
 """
 import argparse, json, shutil, subprocess, sys, tempfile
@@ -131,9 +131,9 @@ def short_err(e):
     return (str(t) + ": " + m.replace("\n", " "))[:110]
 
 def run_browser(rule_path, target_path):
-    """The vendored browser engine, driven through the Node loader."""
+    """The vendored browser engine, driven through scripts/run_rule.mjs."""
     try:
-        p = subprocess.run(["node", "scripts/wasm_parity.mjs", "--rule", str(rule_path), "--target", str(target_path)],
+        p = subprocess.run(["node", "scripts/run_rule.mjs", "--rule", str(rule_path), "--target", str(target_path)],
                            cwd=REPO, capture_output=True, text=True, timeout=90)
     except subprocess.TimeoutExpired:
         return {"lines": None, "errors": ["timeout (90 s)"], "extra": {}}

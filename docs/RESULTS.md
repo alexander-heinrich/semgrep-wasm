@@ -24,7 +24,8 @@ text)`, `execute(lang, rulesFile, root, [targets])` returning Semgrep's CLI JSON
 `integers_stubs_js` are linked). Relative paths resolve against the pseudo-filesystem's `/static/` in the browser,
 so `paths:` globs see the CLI-like target path.
 
-Verification (all against Semgrep 1.172.0 as reference; Opengrep 1.29.0 gives identical answers):
+Verification (all against Semgrep 1.172.0 as reference; Opengrep 1.29.0 gives identical answers; every suite is C#-only —
+the rule-syntax results largely transfer to other languages, the parser results do not):
 
 | suite | result |
 |---|---|
