@@ -1,0 +1,15 @@
+{
+  "name": "semgrep-wasm",
+  "private": true,
+  "description": "The Semgrep OSS engine compiled for the browser (js_of_ocaml + WebAssembly), rebuilt from tag v1.81.0",
+  "type": "module",
+  "scripts": {
+    "test": "node scripts/semantics_check.mjs && python3 scripts/engine_probes.py",
+    "run-rule": "node scripts/run_rule.mjs"
+  },
+  "devDependencies": {
+    "js-yaml": "^4.1.0"
+  },
+  "license": "MIT",
+  "repository": "github:alexander-heinrich/Semgrep-WASM"
+}

@@ -1,6 +1,6 @@
 #!/bin/sh
-# Usage: sh scripts/rebuild-engine/build.sh [--target ocaml|wasm|export] [extra docker build args]
-# Produces scripts/rebuild-engine/out/{engine,csharp,python}/ (gitignored). Needs Docker (Colima works).
+# Usage: sh build/build.sh [--target ocaml|wasm|export] [extra docker build args]
+# Produces build/out/{engine,csharp,python}/ (gitignored). Needs Docker (Colima works).
 set -eu
 cd "$(dirname "$0")"
 target=export

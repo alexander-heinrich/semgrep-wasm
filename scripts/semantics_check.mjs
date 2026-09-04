@@ -1,16 +1,19 @@
 #!/usr/bin/env node
-// Runs the spike's semantics micro-suite (spike/semantics.json, expectations = current Semgrep CLI) through
-// the vendored browser engine and lists every divergence. Usage: node scripts/semantics_check.mjs [--only NAME] [--dump NAME]
+// Runs the semantics suite (tests/semantics.json, expectations = current Semgrep CLI) through the browser
+// engine and lists every divergence. Usage: node scripts/semantics_check.mjs [--only NAME] [--dump NAME]
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
-import { loadEngine, ROOT } from './lib/engine-node.mjs';
+import { fileURLToPath } from 'node:url';
+import { loadEngine } from '../dist/engine-node.mjs';
+
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 const args = process.argv.slice(2);
 const argValue = (name) => (args.find((a) => a.startsWith(`${name}=`)) || '').slice(name.length + 1) || (args.includes(name) ? args[args.indexOf(name) + 1] : '');
 const only = argValue('--only');
 const dump = argValue('--dump');
-const suite = JSON.parse(readFileSync(path.join(ROOT, 'spike', 'semantics.json'), 'utf8'));
-const defaultTarget = readFileSync(path.join(ROOT, 'spike', 'target.cs'), 'utf8');
+const suite = JSON.parse(readFileSync(path.join(ROOT, 'tests', 'semantics.json'), 'utf8'));
+const defaultTarget = readFileSync(path.join(ROOT, 'tests', 'target.cs'), 'utf8');
 
 const { execute, finish } = await loadEngine();
 let pass = 0, fail = 0;

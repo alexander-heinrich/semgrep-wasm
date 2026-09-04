@@ -13,7 +13,7 @@ than regression. Two families:
 Usage:
   python3 scripts/engine_probes.py [rules|syntax|all] [--only SUBSTRING] [--emit PATH] [--quiet]
 
-Engines: the vendored browser build (always, via scripts/run_rule.mjs), `semgrep` and `opengrep`
+Engines: the browser build in dist/ (always, via scripts/run_rule.mjs), `semgrep` and `opengrep`
 if they are on PATH. Exits non-zero when the browser engine differs from the reference CLI.
 """
 import argparse, json, shutil, subprocess, sys, tempfile
