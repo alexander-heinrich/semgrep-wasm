@@ -892,5 +892,132 @@
   "expect": [
    43
   ]
+ },
+ {
+  "name": "py-plain-call",
+  "note": "Python smoke test (the Python parser is otherwise only exercised by metavariable-comparison)",
+  "lang": "python",
+  "rule": {
+   "pattern": "print(\"...\")"
+  },
+  "expect": [
+   6
+  ]
+ },
+ {
+  "name": "py-taint-input-to-system",
+  "lang": "python",
+  "rule": {
+   "mode": "taint",
+   "pattern-sources": [
+    {
+     "pattern": "input()"
+    }
+   ],
+   "pattern-sinks": [
+    {
+     "pattern": "os.system(...)"
+    }
+   ]
+  },
+  "expect": [
+   13
+  ]
+ },
+ {
+  "name": "py-rule-language-filtered",
+  "note": "a rule whose languages omit the run language is skipped silently, no error",
+  "lang": "python",
+  "rule": {
+   "languages": [
+    "csharp"
+   ],
+   "pattern": "print(...)"
+  },
+  "expect": []
+ },
+ {
+  "name": "lang-without-parser",
+  "lang": "java",
+  "rule": {
+   "pattern": "foo()"
+  },
+  "target": "class A { void m() { foo(); } }",
+  "targetPath": "A.java",
+  "expectError": true
+ },
+ {
+  "name": "multi-two-files",
+  "note": "several targets in one call; reported paths carry no run directory",
+  "rule": {
+   "pattern": "Foo($X);"
+  },
+  "targets": [
+   {
+    "path": "src/A.cs",
+    "text": "class A { void M() { Foo(1); } }"
+   },
+   {
+    "path": "src/B.cs",
+    "text": "class B { void M() { Foo(2);\nFoo(3); } }"
+   }
+  ],
+  "expect": {
+   "src/A.cs": [
+    1
+   ],
+   "src/B.cs": [
+    1,
+    2
+   ]
+  }
+ },
+ {
+  "name": "multi-paths-glob",
+  "rule": {
+   "pattern": "Foo($X);",
+   "paths": {
+    "exclude": [
+     "tests/**"
+    ]
+   }
+  },
+  "targets": [
+   {
+    "path": "src/S.cs",
+    "text": "class S { void M() { Foo(1); } }"
+   },
+   {
+    "path": "tests/T.cs",
+    "text": "class T { void M() { Foo(2); } }"
+   }
+  ],
+  "expect": {
+   "src/S.cs": [
+    1
+   ]
+  }
+ },
+ {
+  "name": "multi-parse-error-isolated",
+  "note": "a file that does not parse does not stop the others",
+  "rule": {
+   "pattern": "Foo($X);"
+  },
+  "targets": [
+   {
+    "path": "ok.cs",
+    "text": "class A { void M() { Foo(1); } }"
+   },
+   {
+    "path": "bad.cs",
+    "text": "class { { {"
+   }
+  ],
+  "expect": {
+   "ok.cs": [
+    1
+   ]
+  }
  }
 ]

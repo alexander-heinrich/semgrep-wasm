@@ -29,7 +29,10 @@ Nothing newer can be built this way. This is a one-time reconstruction, not a tr
 ## Using it
 
 **In a browser.** Load the engine and a parser in a module Web Worker; `dist/semgrep-worker.js` is a
-complete example. The parser's WebAssembly side-car is passed explicitly:
+complete example. It answers `{type:'run', id, rules, lang, targets: [{path, text}]}` messages with
+`{type:'result', id, matches, errors, ms}` — one engine call for all the targets, `lang` defaulting to
+`csharp`, reported paths as given (the single-file form `target` + `targetPath` still works). Underneath,
+the parser's WebAssembly side-car is passed explicitly:
 
 ```js
 const { EngineFactory } = await import('./dist/engine-1.81.0.mjs');
@@ -45,14 +48,18 @@ const out = JSON.parse(engine.execute('csharp', 'run-1/rules.json', '.', ['run-1
 
 Two things to know. The engine caches parsed targets by path, so give every run its own directory.
 And relative paths resolve against the pseudo-filesystem's working directory, so a `paths:` glob sees the
-same target path the CLI would. Python is only needed for `metavariable-comparison`, whose expression is
-parsed as Python; add it the same way with `python-1.81.0.mjs` and its `.wasm`.
+same target path the CLI would. The Python parser, added the same way with `python-1.81.0.mjs` and its
+`.wasm`, serves two purposes: `metavariable-comparison` expressions are parsed as Python, and with
+`execute('python', …)` the engine runs rules on Python targets. `generic` and `regex` need no parser at all.
+Rules whose `languages` do not include the language passed to `execute` are skipped silently.
 
-**In Node.** `dist/engine-node.mjs` loads the CommonJS builds and exposes `execute(rules, target, path)`.
+**In Node.** `dist/engine-node.mjs` loads the CommonJS builds and exposes `execute(rules, target, path,
+lang = 'csharp')` and `executeMany(rules, [{path, text}], lang)`.
 
 ```sh
 npm install
-node scripts/run_rule.mjs --rule rule.yaml --target Program.cs      # findings as JSON
+node scripts/run_rule.mjs --rule rule.yaml --target Program.cs                 # findings as JSON
+node scripts/run_rule.mjs --rule rule.yaml --target app.py --lang python
 ```
 
 Sizes: engine 6.4 MB, C# parser 3.4 MB plus 5.7 MB of WebAssembly, Python parser 3.8 MB plus 0.4 MB.
@@ -61,18 +68,19 @@ Engine and both parsers are ready about 540 ms after a worker starts; a rule run
 ## Verifying it
 
 Reference is Semgrep 1.172.0; Opengrep 1.29.0 gives identical answers. Every suite runs on C#, the
-only language verified: the rule-syntax evidence exercises language-independent engine code and largely
-transfers, the syntax evidence covers the C# grammar and its translation only and transfers to no other
-language.
+only language verified in depth: the rule-syntax evidence exercises language-independent engine code and
+largely transfers, the syntax evidence covers the C# grammar and its translation only and transfers to no
+other language. Python has a smoke test only (three cases in the semantics suite, checked against the
+same CLI), and four further cases cover multi-target runs.
 
 ```sh
-node scripts/semantics_check.mjs        # 67 pattern-semantics checks against stored CLI-derived answers
+node scripts/semantics_check.mjs        # 74 pattern-semantics checks against stored CLI-derived answers
 python3 scripts/engine_probes.py        # 60 differential probes: this build vs semgrep vs opengrep on PATH
 ```
 
 | suite | result |
 |---|---|
-| `scripts/semantics_check.mjs`, 67 cases | 67/67 |
+| `scripts/semantics_check.mjs`, 67 C# cases + 3 Python + 4 multi-target | 74/74 |
 | `scripts/engine_probes.py rules`, 31 rule-key probes | identical to the CLI, including error cases |
 | `scripts/engine_probes.py syntax`, 29 C# 9–14 samples | identical, including the same partial-parse errors |
 
@@ -138,8 +146,8 @@ The full investigation, including the retired 2023 engine's gap table, is in `do
 | path | what |
 |---|---|
 | `dist/` | the eight built files, the LGPL licence text, `SHA256SUMS`, `VERSIONS.md`, and the three loader files: `engine-output.js` (CLI JSON → simple shape), `engine-node.mjs` (Node loader), `semgrep-worker.js` (browser worker). Copy this directory as a whole. |
-| `build/` | `Dockerfile`, `build.sh`, `install.sh` |
+| `build/` | `Dockerfile`, `build.sh`, `install.sh`, `checksums.sh` (refreshes `dist/SHA256SUMS` after a loader edit) |
 | `scripts/` | `run_rule.mjs`, `semantics_check.mjs`, `engine_probes.py` |
-| `tests/` | the 67 semantics cases and their target, the recorded probe results |
+| `tests/` | the 74 semantics cases and their C# and Python targets, the recorded probe results |
 | `docs/` | `RESULTS.md`, the feasibility investigation and the gap table of the 2023 packages |
 | `spike/` | the 2023 harness (Node and browser smoke tests, runtime shims) that `docs/RESULTS.md` describes |

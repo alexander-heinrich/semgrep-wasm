@@ -1,9 +1,12 @@
 // Example module Web Worker that hosts the engine and runs rules on demand. It lives inside dist/ next to the
 // engine files (copy the directory as a whole) and is driven from the main thread with postMessage.
-// Protocol: main → {type:'init'} | {type:'run', id, rules, target, targetPath}
+// Protocol: main → {type:'init'}
+//                | {type:'run', id, rules, lang?, targets?: [{path, text}], target?, targetPath?}
+//                  (`lang` defaults to 'csharp'; `target` + `targetPath` are the single-file form of `targets`)
 //           worker → {type:'progress', stage} | {type:'ready', timings} | {type:'fatal', message}
 //                    | {type:'result', id, matches, errors, ms} | {type:'log', message}
-import { normalizeEngineOutput, describeThrown } from './engine-output.js';
+// Reported paths are the target paths as given (sanitized), without the per-run directory prefix.
+import { normalizeEngineOutput, describeThrown, sanitizeTargetPath, stripRunDir } from './engine-output.js';
 
 const VENDOR = new URL('./', import.meta.url);
 const ENGINE_URL = new URL('engine-1.81.0.mjs', VENDOR).href;
@@ -32,7 +35,7 @@ async function init() {
     timings.csharp = Math.round(performance.now() - t0);
     post({ type: 'progress', stage: 'python' });
     try {
-      // only needed for metavariable-comparison (the comparison expression is parsed as Python)
+      // needed for metavariable-comparison (the comparison expression is parsed as Python) and for Python targets
       const py = await import(PYTHON_URL);
       engine.addParser(await py.ParserFactory(PYTHON_WASM_URL));
       timings.python = Math.round(performance.now() - t0);
@@ -47,9 +50,7 @@ async function init() {
   }
 }
 
-
-
-function run({ id, rules, target, targetPath }) {
+function run({ id, rules, lang = 'csharp', targets, target, targetPath }) {
   if (!ready) { post({ type: 'result', id, matches: [], errors: [{ error_type: 'engine', message: 'engine not ready' }], ms: 0 }); return; }
   // The engine caches parsed targets by path, so every run gets its own directory. Relative paths resolve
   // against the pseudo-filesystem's working directory; a `paths:` glob such as tests/** still applies
@@ -57,21 +58,30 @@ function run({ id, rules, target, targetPath }) {
   runCounter += 1;
   const dir = `run-${runCounter}`;
   const rulesPath = `${dir}/rules.json`;
-  const tPath = `${dir}/${(targetPath || 'target.cs').replace(/^\/+/, '')}`;
+  const list = Array.isArray(targets) && targets.length ? targets : [{ path: targetPath, text: target }];
+  const seen = new Set(), files = [];
+  for (const t of list) {
+    const p = sanitizeTargetPath(t && t.path);
+    if (seen.has(p)) continue;
+    seen.add(p);
+    files.push({ path: `${dir}/${p}`, text: String((t && t.text) ?? '') });
+  }
   const started = performance.now();
+  const reply = (matches, errors) => post({ type: 'result', id, matches, errors, ms: Math.round(performance.now() - started) });
+  if (!files.length) { reply([], [{ error_type: 'engine', message: 'no target files' }]); return; }
   const origLog = console.log;
   console.log = () => {};
   try {
     engine.writeFile(rulesPath, JSON.stringify({ rules }));
-    engine.writeFile(tPath, target);
-    const out = engine.execute('csharp', rulesPath, '.', [tPath]);
-    const { matches, errors } = normalizeEngineOutput(JSON.parse(out));
-    post({ type: 'result', id, matches, errors, ms: Math.round(performance.now() - started) });
+    for (const f of files) engine.writeFile(f.path, f.text);
+    const out = engine.execute(String(lang || 'csharp'), rulesPath, '.', files.map((f) => f.path));
+    const { matches, errors } = stripRunDir(normalizeEngineOutput(JSON.parse(out)), dir);
+    reply(matches, errors);
   } catch (e) {
-    post({ type: 'result', id, matches: [], errors: [{ error_type: 'rule error', message: describeThrown(e) }], ms: Math.round(performance.now() - started) });
+    reply([], [{ error_type: 'rule error', message: describeThrown(e) }]);
   } finally {
     console.log = origLog;
-    for (const p of [rulesPath, tPath]) { try { engine.deleteFile(p); } catch (_) { /* nothing to clean */ } }
+    for (const p of [rulesPath, ...files.map((f) => f.path)]) { try { engine.deleteFile(p); } catch (_) { /* nothing to clean */ } }
   }
 }
 

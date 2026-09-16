@@ -35,3 +35,22 @@ export function normalizeEngineOutput(parsed) {
   }));
   return { matches, errors };
 }
+
+/** Normalise a target path for the pseudo-filesystem: forward slashes, no leading slashes, no `.` / `..` segments. */
+export function sanitizeTargetPath(p, fallback = 'target.cs') {
+  const parts = String(p || '').replace(/\\/g, '/').split('/').filter((s) => s && s !== '.' && s !== '..');
+  return parts.length ? parts.join('/') : fallback;
+}
+
+/** Every run writes its files under `dir/`; remove that prefix from the paths the engine reports (mutates and returns). */
+export function stripRunDir(result, dir) {
+  const prefix = dir + '/';
+  const strip = (s) => (typeof s === 'string' ? s.split(prefix).join('') : s);
+  for (const m of result.matches) if (m.location) m.location.path = strip(m.location.path);
+  for (const e of result.errors) {
+    if (e.path !== undefined) e.path = strip(e.path);
+    e.message = strip(e.message);
+    if (Array.isArray(e.spans)) for (const s of e.spans) if (s && typeof s.file === 'string') s.file = strip(s.file);
+  }
+  return result;
+}

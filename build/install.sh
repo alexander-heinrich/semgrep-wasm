@@ -1,6 +1,6 @@
 #!/bin/sh
 # Copies the artifacts produced by build.sh (out/) into dist/ under versioned names, removes the previous
-# engine files and regenerates SHA256SUMS (which also covers the three loader files that ship in dist/). Usage: sh build/install.sh [TAG]
+# engine files and regenerates SHA256SUMS via checksums.sh (which also covers the three loader files that ship in dist/). Usage: sh build/install.sh [TAG]
 set -eu
 cd "$(dirname "$0")"
 TAG="${1:-1.81.0}"
@@ -16,4 +16,5 @@ for lang in csharp python; do
   cp "out/$lang/index.cjs" "$DEST/$lang-$TAG.cjs"
   cp "out/$lang/semgrep-parser.wasm" "$DEST/$lang-$TAG.wasm"
 done
-(cd "$DEST" && shasum -a 256 engine-[0-9]*.mjs engine-[0-9]*.cjs csharp-* python-* engine-output.js engine-node.mjs semgrep-worker.js > SHA256SUMS && cat SHA256SUMS && ls -la engine-* csharp-* python-*)
+sh "$(dirname "$0")/checksums.sh"
+(cd "$DEST" && ls -la engine-* csharp-* python-*)

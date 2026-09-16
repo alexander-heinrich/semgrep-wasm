@@ -6,7 +6,7 @@ import { mkdirSync, mkdtempSync, rmSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { normalizeEngineOutput, describeThrown } from './engine-output.js';
+import { normalizeEngineOutput, describeThrown, sanitizeTargetPath, stripRunDir } from './engine-output.js';
 
 export const VENDOR = path.dirname(fileURLToPath(import.meta.url));
 export const FILES = {
@@ -36,27 +36,44 @@ export async function loadEngine({ verbose = false } = {}) {
   // The engine caches parsed targets by path, so every run gets its own directory (a `paths:` glob such
   // as tests/** still applies: Semgrep matches it at any depth, verified against the CLI).
   let runCounter = 0;
-  function execute(rulesObj, targetText, targetPath) {
+
+  /** Run the rules on several targets ([{path, text}]) in one engine call; reported paths lack the run directory. */
+  function executeMany(rulesObj, targets, lang = 'csharp') {
     runCounter += 1;
     const dir = `run-${runCounter}`;
     const rulesPath = `${dir}/rules.json`;
-    const tPath = `${dir}/${(targetPath || 'target.cs').replace(/^\/+/, '')}`;
-    mkdirSync(path.dirname(path.join(fsRoot, tPath)), { recursive: true });
+    const seen = new Set(), files = [];
+    for (const t of targets || []) {
+      const p = sanitizeTargetPath(t && t.path);
+      if (seen.has(p)) continue;
+      seen.add(p);
+      files.push({ path: `${dir}/${p}`, text: String((t && t.text) ?? '') });
+    }
     const started = Date.now();
+    if (!files.length) return { matches: [], errors: [{ error_type: 'engine', message: 'no target files' }], ms: 0 };
     const origLog = console.log;
     console.log = () => {};
     try {
+      mkdirSync(path.join(fsRoot, dir), { recursive: true });
       engine.writeFile(rulesPath, JSON.stringify(rulesObj));
-      engine.writeFile(tPath, targetText);
-      const out = engine.execute('csharp', rulesPath, '.', [tPath]);
+      for (const f of files) {
+        mkdirSync(path.dirname(path.join(fsRoot, f.path)), { recursive: true });
+        engine.writeFile(f.path, f.text);
+      }
+      const out = engine.execute(String(lang || 'csharp'), rulesPath, '.', files.map((f) => f.path));
       const parsed = JSON.parse(out);
-      return { ...normalizeEngineOutput(parsed), raw: parsed, ms: Date.now() - started };
+      return { ...stripRunDir(normalizeEngineOutput(parsed), dir), raw: parsed, ms: Date.now() - started };
     } catch (e) {
       return { matches: [], errors: [{ error_type: 'engine exception', message: describeThrown(e) }], ms: Date.now() - started };
     } finally {
       console.log = origLog;
-      for (const p of [rulesPath, tPath]) { try { engine.deleteFile(p); } catch (_) { /* nothing to clean */ } }
+      for (const p of [rulesPath, ...files.map((f) => f.path)]) { try { engine.deleteFile(p); } catch (_) { /* nothing to clean */ } }
     }
+  }
+
+  /** Single-target form: rules on one file's text under the given path. */
+  function execute(rulesObj, targetText, targetPath, lang = 'csharp') {
+    return executeMany(rulesObj, [{ path: targetPath || 'target.cs', text: targetText }], lang);
   }
 
   function finish(code = 0) {
@@ -64,5 +81,5 @@ export async function loadEngine({ verbose = false } = {}) {
     rmSync(fsRoot, { recursive: true, force: true });
     process.exit(code);
   }
-  return { engine, execute, finish, startDir };
+  return { engine, execute, executeMany, finish, startDir };
 }
