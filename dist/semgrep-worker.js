@@ -5,8 +5,8 @@
 //                  (`lang` defaults to 'csharp'; `target` + `targetPath` are the single-file form of `targets`)
 //           worker → {type:'progress', stage} | {type:'ready', timings} | {type:'fatal', message}
 //                    | {type:'result', id, matches, errors, ms} | {type:'log', message}
-// Reported paths are the target paths as given (sanitized), without the per-run directory prefix.
-import { normalizeEngineOutput, describeThrown, sanitizeTargetPath, stripRunDir } from './engine-output.js';
+// Reported paths are exactly the target paths the caller gave.
+import { normalizeEngineOutput, describeThrown, layoutTargets, restorePaths } from './engine-output.js';
 
 const VENDOR = new URL('./', import.meta.url);
 const ENGINE_URL = new URL('engine-1.81.0.mjs', VENDOR).href;
@@ -52,20 +52,13 @@ async function init() {
 
 function run({ id, rules, lang = 'csharp', targets, target, targetPath }) {
   if (!ready) { post({ type: 'result', id, matches: [], errors: [{ error_type: 'engine', message: 'engine not ready' }], ms: 0 }); return; }
-  // The engine caches parsed targets by path, so every run gets its own directory. Relative paths resolve
-  // against the pseudo-filesystem's working directory; a `paths:` glob such as tests/** still applies
-  // because Semgrep matches it at any depth.
+  // Every run gets its own directory (the engine caches file contents by path, see layoutTargets); reported
+  // paths are mapped back to the names given. Relative paths resolve against the pseudo-filesystem's working
+  // directory, and a `paths:` glob such as tests/** still applies because Semgrep matches it at any depth.
   runCounter += 1;
   const dir = `run-${runCounter}`;
   const rulesPath = `${dir}/rules.json`;
-  const list = Array.isArray(targets) && targets.length ? targets : [{ path: targetPath, text: target }];
-  const seen = new Set(), files = [];
-  for (const t of list) {
-    const p = sanitizeTargetPath(t && t.path);
-    if (seen.has(p)) continue;
-    seen.add(p);
-    files.push({ path: `${dir}/${p}`, text: String((t && t.text) ?? '') });
-  }
+  const files = layoutTargets(Array.isArray(targets) ? targets : [{ path: targetPath, text: target }], dir);
   const started = performance.now();
   const reply = (matches, errors) => post({ type: 'result', id, matches, errors, ms: Math.round(performance.now() - started) });
   if (!files.length) { reply([], [{ error_type: 'engine', message: 'no target files' }]); return; }
@@ -75,7 +68,7 @@ function run({ id, rules, lang = 'csharp', targets, target, targetPath }) {
     engine.writeFile(rulesPath, JSON.stringify({ rules }));
     for (const f of files) engine.writeFile(f.path, f.text);
     const out = engine.execute(String(lang || 'csharp'), rulesPath, '.', files.map((f) => f.path));
-    const { matches, errors } = stripRunDir(normalizeEngineOutput(JSON.parse(out)), dir);
+    const { matches, errors } = restorePaths(normalizeEngineOutput(JSON.parse(out)), files);
     reply(matches, errors);
   } catch (e) {
     reply([], [{ error_type: 'rule error', message: describeThrown(e) }]);

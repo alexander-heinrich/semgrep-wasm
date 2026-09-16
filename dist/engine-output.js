@@ -42,15 +42,47 @@ export function sanitizeTargetPath(p, fallback = 'target.cs') {
   return parts.length ? parts.join('/') : fallback;
 }
 
-/** Every run writes its files under `dir/`; remove that prefix from the paths the engine reports (mutates and returns). */
-export function stripRunDir(result, dir) {
-  const prefix = dir + '/';
-  const strip = (s) => (typeof s === 'string' ? s.split(prefix).join('') : s);
-  for (const m of result.matches) if (m.location) m.location.path = strip(m.location.path);
+/**
+ * Lay out the targets of one run under `dir`: sanitize each path, drop duplicates (first wins), keep the path
+ * the caller gave so the report can use it again. `targets` is [{path, text}]; the result is [{given, path, text}]
+ * where `path` is where the file is written. Every run needs its own directory: the engine caches file contents
+ * by path for pattern-regex, metavariable-regex and fix rendering, which answer from the previous run's text on a
+ * reused path (or throw Invalid_argument: String.sub); plain patterns are unaffected.
+ */
+export function layoutTargets(targets, dir) {
+  const seen = new Set(), files = [];
+  for (const t of targets || []) {
+    const clean = sanitizeTargetPath(t && t.path);
+    if (seen.has(clean)) continue;
+    seen.add(clean);
+    const raw = t && t.path != null ? String(t.path) : '';
+    files.push({ given: raw || clean, path: `${dir}/${clean}`, text: String((t && t.text) ?? '') });
+  }
+  return files;
+}
+
+/** Rewrite the paths the engine reports (and quotes in messages) back to the paths the caller gave (mutates and returns). */
+export function restorePaths(result, files) {
+  const back = new Map(files.map((f) => [f.path, f.given]));
+  const fix = (s) => (typeof s === 'string' && back.has(s) ? back.get(s) : s);
+  const escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const written = [...back.keys()].sort((a, b) => b.length - a.length); // longest first, replaced in one pass
+  const inText = written.length ? new RegExp(written.map(escapeRe).join('|'), 'g') : null;
+  const fixText = (s) => (typeof s === 'string' && inText ? s.replace(inText, (w) => back.get(w)) : s);
+  const walk = (v) => {
+    if (Array.isArray(v)) v.forEach(walk);
+    else if (v && typeof v === 'object') {
+      if (typeof v.path === 'string') v.path = fix(v.path);
+      if (typeof v.file === 'string') v.file = fix(v.file);
+      for (const k of Object.keys(v)) if (k !== 'path' && k !== 'file') walk(v[k]);
+    }
+  };
+  for (const m of result.matches) if (m.location) m.location.path = fix(m.location.path);
   for (const e of result.errors) {
-    if (e.path !== undefined) e.path = strip(e.path);
-    e.message = strip(e.message);
-    if (Array.isArray(e.spans)) for (const s of e.spans) if (s && typeof s.file === 'string') s.file = strip(s.file);
+    if (typeof e.path === 'string') e.path = fix(e.path);
+    e.message = fixText(e.message);
+    walk(e.spans);
+    walk(e.error_type);
   }
   return result;
 }

@@ -2,7 +2,9 @@
 // Runs the semantics suite (tests/semantics.json, expectations = current Semgrep CLI) through the browser
 // engine and lists every divergence. Usage: node scripts/semantics_check.mjs [--only NAME] [--dump NAME]
 // A case may set `lang` (default csharp; picks the default target) and either `target`/`targetPath` or
-// `targets: [{path, text | file}]` — in the multi-target form `expect` maps each path to its matched lines.
+// `targets: [{path, text | file}]` — in the multi-target form `expect` maps each path to its matched lines and
+// `expectErrors` lists the paths that must appear in an error. `before: {target, targetPath?}` runs the rule on other
+// content at the same path first; the case then checks that nothing of it leaks into the real run.
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -31,6 +33,7 @@ for (const test of suite) {
   const dflt = DEFAULTS[lang] || DEFAULTS.csharp;
   const rule = Object.assign({ id: test.id || 'r', message: 'm', languages: [lang], severity: 'WARNING' }, test.rule);
   let res, got, want;
+  if (test.before) execute({ rules: [rule] }, test.before.target, test.before.targetPath || test.targetPath || dflt.path, lang);
   if (Array.isArray(test.targets)) {
     const targets = test.targets.map((t) => ({ path: t.path, text: t.file ? readFileSync(path.join(ROOT, 'tests', t.file), 'utf8') : t.text }));
     res = executeMany({ rules: [rule] }, targets, lang);
@@ -39,17 +42,17 @@ for (const test of suite) {
     res = execute({ rules: [rule] }, test.target || dflt.text, test.targetPath || dflt.path, lang);
     got = sortedLines(res.matches); want = test.expect;
   }
-  const lines = got;
-  const errs = res.errors.map((e) => `${e.error_type || ''}:${String(e.message || '').split('\n')[0].slice(0, 100)}`);
+  const errs = res.errors.map((e) => `${Array.isArray(e.error_type) ? e.error_type[0] : e.error_type || ''}:${String(e.message || '').split('\n')[0].slice(0, 100)}`);
   let status;
   if (test.expectError) status = errs.length ? 'ok(err)' : 'FAIL(no error)';
-  else if (JSON.stringify(got) === JSON.stringify(want)) status = 'ok';
-  else status = 'FAIL';
+  else if (JSON.stringify(got) !== JSON.stringify(want)) status = 'FAIL';
+  else if (test.expectErrors && !test.expectErrors.every((p) => res.errors.some((e) => e.path === p))) status = 'FAIL(errors)';
+  else status = 'ok';
   if (status.startsWith('ok')) pass++; else fail++;
   const extra = [];
   if (test.checkFix && res.matches.length) extra.push(`fix=${JSON.stringify(res.matches[0].extra.fix ?? res.matches[0].extra.fixed_lines ?? null)}`);
   if (test.showMetavars && res.matches.length) extra.push(`metavars=${Object.keys(res.matches[0].extra.metavars || {}).join(',') || 'none'}`);
-  console.log(`[${status.padEnd(13)}] ${test.name.padEnd(34)} got=${JSON.stringify(lines)} want=${JSON.stringify(test.expect ?? 'error')} ${res.ms}ms${errs.length ? ' errors=' + JSON.stringify(errs).slice(0, 160) : ''}${extra.length ? ' ' + extra.join(' ') : ''}`);
+  console.log(`[${status.padEnd(13)}] ${test.name.padEnd(34)} got=${JSON.stringify(got)} want=${JSON.stringify(test.expect ?? 'error')} ${res.ms}ms${errs.length ? ' errors=' + JSON.stringify(errs).slice(0, 160) : ''}${extra.length ? ' ' + extra.join(' ') : ''}`);
   if (dump === test.name && res.raw) console.log(JSON.stringify(res.raw).slice(0, 3000));
 }
 console.log(`\n${pass} passed, ${fail} failed`);

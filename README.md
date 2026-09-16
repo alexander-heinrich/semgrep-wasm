@@ -46,9 +46,12 @@ const out = JSON.parse(engine.execute('csharp', 'run-1/rules.json', '.', ['run-1
 // out.results[] in Semgrep's CLI JSON shape; dist/engine-output.js converts it to a simpler form
 ```
 
-Two things to know. The engine caches parsed targets by path, so give every run its own directory.
-And relative paths resolve against the pseudo-filesystem's working directory, so a `paths:` glob sees the
-same target path the CLI would. The Python parser, added the same way with `python-1.81.0.mjs` and its
+Two things to know. The engine keeps a per-path cache of file contents that its regex features read —
+`pattern-regex`, `metavariable-regex` and the rendering of `fix` / `fix-regex` — so a path reused with new
+content answers those from the previous text (plain patterns are unaffected). Give every run its own
+directory; the loaders do, and map the reported paths back to the names you gave. And relative paths
+resolve against the pseudo-filesystem's working directory, so a `paths:` glob sees the same target path
+the CLI would. The Python parser, added the same way with `python-1.81.0.mjs` and its
 `.wasm`, serves two purposes: `metavariable-comparison` expressions are parsed as Python, and with
 `execute('python', …)` the engine runs rules on Python targets. `generic` and `regex` need no parser at all.
 Rules whose `languages` do not include the language passed to `execute` are skipped silently.
@@ -71,16 +74,16 @@ Reference is Semgrep 1.172.0; Opengrep 1.29.0 gives identical answers. Every sui
 only language verified in depth: the rule-syntax evidence exercises language-independent engine code and
 largely transfers, the syntax evidence covers the C# grammar and its translation only and transfers to no
 other language. Python has a smoke test only (three cases in the semantics suite, checked against the
-same CLI), and four further cases cover multi-target runs.
+same CLI); further cases cover multi-target runs, an unsupported language and path reuse across runs.
 
 ```sh
-node scripts/semantics_check.mjs        # 74 pattern-semantics checks against stored CLI-derived answers
+node scripts/semantics_check.mjs        # 76 pattern-semantics checks against stored CLI-derived answers
 python3 scripts/engine_probes.py        # 60 differential probes: this build vs semgrep vs opengrep on PATH
 ```
 
 | suite | result |
 |---|---|
-| `scripts/semantics_check.mjs`, 67 C# cases + 3 Python + 4 multi-target | 74/74 |
+| `scripts/semantics_check.mjs`, 67 C# cases + 3 Python + 4 multi-target + 1 unsupported language + 1 path reuse | 76/76 |
 | `scripts/engine_probes.py rules`, 31 rule-key probes | identical to the CLI, including error cases |
 | `scripts/engine_probes.py syntax`, 29 C# 9–14 samples | identical, including the same partial-parse errors |
 
@@ -131,8 +134,12 @@ command.
 5. **esbuild could not write its output**, as root, into a directory root had just created. npm ≥ 7 drops
    privileges to the owner of the working directory; the tree copied from the OCaml stage is owned by uid
    1000. One `chown -R root:root js` fixes it.
-6. **The engine caches parsed targets by path**, so reusing file names across runs applies a stale
-   syntax tree and eventually throws `Invalid_argument: String.sub`. Every run gets its own directory.
+6. **The engine caches file contents by path** for its regex features and fix rendering: reusing a file name
+   across runs feeds `pattern-regex`, `metavariable-regex`, `fix` and `fix-regex` the previous run's text
+   (missing or misplaced matches, wrong fixes, eventually `Invalid_argument: String.sub`), while plain
+   patterns read the new file. Every run gets its own directory. (Re-learned on 2026-09-16: a re-test with
+   plain patterns suggested the directory was unnecessary, and the challenge parity suite promptly failed
+   five regex- and fix-based cases; `regex-after-same-path-rewrite` in the semantics suite now guards it.)
 7. **Fix rendering moved into the engine.** The 2023 build never emitted `extra.fix`; this one does.
 8. **Interface changes.** `execute(lang, rulesFile, root, [targets])` plus `writeFile`/`deleteFile`
    replace the create-once `jsoo_create_file` global; output is the CLI JSON shape (`results[]` with
@@ -148,6 +155,6 @@ The full investigation, including the retired 2023 engine's gap table, is in `do
 | `dist/` | the eight built files, the LGPL licence text, `SHA256SUMS`, `VERSIONS.md`, and the three loader files: `engine-output.js` (CLI JSON → simple shape), `engine-node.mjs` (Node loader), `semgrep-worker.js` (browser worker). Copy this directory as a whole. |
 | `build/` | `Dockerfile`, `build.sh`, `install.sh`, `checksums.sh` (refreshes `dist/SHA256SUMS` after a loader edit) |
 | `scripts/` | `run_rule.mjs`, `semantics_check.mjs`, `engine_probes.py` |
-| `tests/` | the 74 semantics cases and their C# and Python targets, the recorded probe results |
+| `tests/` | the 76 semantics cases and their C# and Python targets, the recorded probe results |
 | `docs/` | `RESULTS.md`, the feasibility investigation and the gap table of the 2023 packages |
 | `spike/` | the 2023 harness (Node and browser smoke tests, runtime shims) that `docs/RESULTS.md` describes |

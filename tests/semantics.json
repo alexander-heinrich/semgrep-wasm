@@ -1000,7 +1000,7 @@
  },
  {
   "name": "multi-parse-error-isolated",
-  "note": "a file that does not parse does not stop the others",
+  "note": "a file that parses only partially reports an error under its own path and does not stop the others",
   "rule": {
    "pattern": "Foo($X);"
   },
@@ -1011,13 +1011,73 @@
    },
    {
     "path": "bad.cs",
-    "text": "class { { {"
+    "text": "Foo(1)"
    }
   ],
   "expect": {
    "ok.cs": [
     1
    ]
+  },
+  "expectErrors": [
+   "bad.cs"
+  ]
+ },
+ {
+  "name": "multi-paths-as-given",
+  "note": "reported paths are the paths given, even when the engine saw a sanitized form",
+  "rule": {
+   "pattern": "Foo($X);"
+  },
+  "targets": [
+   {
+    "path": "/lib/A.cs",
+    "text": "class A { void M() { Foo(1); } }"
+   },
+   {
+    "path": "./B.cs",
+    "text": "class B { void M() { Foo(2); } }"
+   },
+   {
+    "path": "src\\C.cs",
+    "text": "class C { void M() { Foo(3); } }"
+   }
+  ],
+  "expect": {
+   "/lib/A.cs": [
+    1
+   ],
+   "./B.cs": [
+    1
+   ],
+   "src\\C.cs": [
+    1
+   ]
   }
+ },
+ {
+  "name": "regex-after-same-path-rewrite",
+  "note": "pattern-regex, metavariable-regex and fix rendering read file contents from a per-path cache: a reused path must not answer with the previous run's text (each run needs its own directory; plain patterns are unaffected)",
+  "rule": {
+   "patterns": [
+    {
+     "pattern": "Foo($X);"
+    },
+    {
+     "metavariable-regex": {
+      "metavariable": "$X",
+      "regex": "^\"(alpha|beta)"
+     }
+    }
+   ]
+  },
+  "before": {
+   "target": "class A {\n  void M() {\n    // xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\n    // yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy\n    Foo(\"alpha\");\n  }\n}\n"
+  },
+  "target": "class B { void M() { Foo(\"beta\"); } }\n",
+  "targetPath": "Reuse/Same.cs",
+  "expect": [
+   1
+  ]
  }
 ]

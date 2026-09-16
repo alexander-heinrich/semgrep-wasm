@@ -6,7 +6,7 @@ import { mkdirSync, mkdtempSync, rmSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { normalizeEngineOutput, describeThrown, sanitizeTargetPath, stripRunDir } from './engine-output.js';
+import { normalizeEngineOutput, describeThrown, layoutTargets, restorePaths } from './engine-output.js';
 
 export const VENDOR = path.dirname(fileURLToPath(import.meta.url));
 export const FILES = {
@@ -33,22 +33,17 @@ export async function loadEngine({ verbose = false } = {}) {
   engine.addParser(await py.ParserFactory(path.join(VENDOR, FILES.pythonWasm)));
   if (verbose) console.error(`engine loaded; parsers: ${['csharp', 'python'].filter((l) => engine.hasParser(l)).join(', ')}`);
 
-  // The engine caches parsed targets by path, so every run gets its own directory (a `paths:` glob such
-  // as tests/** still applies: Semgrep matches it at any depth, verified against the CLI).
+  // Every run gets its own directory (the engine caches file contents by path, see layoutTargets); reported
+  // paths are mapped back to the names given. A `paths:` glob such as tests/** still applies: Semgrep matches
+  // it at any depth, verified against the CLI.
   let runCounter = 0;
 
-  /** Run the rules on several targets ([{path, text}]) in one engine call; reported paths lack the run directory. */
+  /** Run the rules on several targets ([{path, text}]) in one engine call; reported paths are the paths given. */
   function executeMany(rulesObj, targets, lang = 'csharp') {
     runCounter += 1;
     const dir = `run-${runCounter}`;
     const rulesPath = `${dir}/rules.json`;
-    const seen = new Set(), files = [];
-    for (const t of targets || []) {
-      const p = sanitizeTargetPath(t && t.path);
-      if (seen.has(p)) continue;
-      seen.add(p);
-      files.push({ path: `${dir}/${p}`, text: String((t && t.text) ?? '') });
-    }
+    const files = layoutTargets(targets, dir);
     const started = Date.now();
     if (!files.length) return { matches: [], errors: [{ error_type: 'engine', message: 'no target files' }], ms: 0 };
     const origLog = console.log;
@@ -62,7 +57,7 @@ export async function loadEngine({ verbose = false } = {}) {
       }
       const out = engine.execute(String(lang || 'csharp'), rulesPath, '.', files.map((f) => f.path));
       const parsed = JSON.parse(out);
-      return { ...stripRunDir(normalizeEngineOutput(parsed), dir), raw: parsed, ms: Date.now() - started };
+      return { ...restorePaths(normalizeEngineOutput(parsed), files), raw: parsed, ms: Date.now() - started };
     } catch (e) {
       return { matches: [], errors: [{ error_type: 'engine exception', message: describeThrown(e) }], ms: Date.now() - started };
     } finally {

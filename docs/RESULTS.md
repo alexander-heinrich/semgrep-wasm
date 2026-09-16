@@ -14,7 +14,7 @@ Build time on an M3 with Colima (6 CPUs, 12 GiB, Rosetta for the amd64 emsdk ima
 Gotchas: the base image's local opam snapshot is stale (`opam update` re-syncs from `file://`, so pin the
 repository explicitly); two 2024 packages fail checksum verification against today's GitHub archives (fixed by
 the source cache); npm ≥ 7 drops privileges to the owner of the working directory, so `npx esbuild` could
-not write into root-owned `dist/` until the copied tree was `chown`ed; the engine caches parsed targets by
+not write into root-owned `dist/` until the copied tree was `chown`ed; the engine caches file contents by
 path, so every run must use a fresh directory (`run-<n>/…`).
 
 API of the v1.81.0 engine: `EngineFactory()` → `addParser(await ParserFactory(wasmUrl))`, `writeFile(path,
