@@ -6,12 +6,14 @@ results. Unlike scripts/semantics_check.mjs, there are no stored expectations: a
 the vendored browser engine agrees with the reference CLI, so the suite detects divergence rather
 than regression. Two families:
 
-  rules   31 rule-syntax probes (regex operators, paths, version constraints, taint options,
-          focus lists, message and fix rendering, severities, metavariable-type, ...)
-  syntax  29 C# 9-14 language samples, checking the parser accepts modern syntax
+  rules   rule-syntax probes (regex operators, paths, version constraints, taint options, focus
+          lists, message and fix rendering, severities, metavariable-type, ...): 31 on a C# target,
+          28 on a C++ target, 4 on a C target
+  syntax  language samples, checking the parser accepts modern syntax: 29 for C# 9-14, 33 for
+          C++11-23, 8 for C99/C11 (C is parsed by the C++ parser)
 
 Usage:
-  python3 scripts/engine_probes.py [rules|syntax|all] [--only SUBSTRING] [--emit PATH] [--quiet]
+  python3 scripts/engine_probes.py [rules|syntax|all] [--lang csharp|cpp|c|all] [--only SUBSTRING] [--emit PATH] [--quiet]
 
 Engines: the browser build in dist/ (always, via scripts/run_rule.mjs), `semgrep` and `opengrep`
 if they are on PATH. Exits non-zero when the browser engine differs from the reference CLI.
@@ -124,16 +126,148 @@ SYNTAX = {
 }
 SYNTAX_RULE = rule("pattern: Foo(1)")
 
+# ---- C++ (the same probes where they translate, on an equivalent target) ----------------------------------
+TARGET_CPP = """#include <cstdio>
+#include <string>
+const char* KEY = "0123456789abcdef0123456789abcdef";
+void M(const char* input, int n) {
+    auto a = Foo(input);
+    auto b = Bar(a);
+    Sink(b);
+    Sink(Foo("lit"));
+    if (n > 5 && input != nullptr) { Baz(n); }
+    if (input != nullptr && n > 5) { Baz(n); }
+    Use(KEY);
+    printf("hello world");
+    printf("hi %s", input);
+    Check(30);
+    Check(10);
+    Qux(input);
+    Qux(Escape(input));
+    std::string s = "abc" + input;
+    Log(s);
+    Emit(a, 5);
+    Foo(1);
+}
+"""
+HEAD_CPP = HEAD.replace("[csharp]", "[cpp]")
+def rule_cpp(body, head=HEAD_CPP):
+    return rule(body, head)
+RULES_CPP = {
+ "max-version-past":        (rule_cpp('max-version: "1.0.0"\npattern: Sink($X)'), "[] rule skipped"),
+ "focus-metavariable-list": (rule_cpp("patterns:\n- pattern: if ($A && $B) { ... }\n- focus-metavariable: [$A, $B]"), "[9, 9, 10, 10]"),
+ "message-interpolation":   (rule_cpp("pattern: Sink($X)", HEAD_CPP.replace("message: m", "message: found $X")), "message 'found b'"),
+ "taint-labels":            (rule_cpp("mode: taint\npattern-sources:\n- pattern: input\n  label: INPUT\npattern-sinks:\n- pattern: Sink($X)\n  requires: INPUT"), "[7]"),
+ "taint-default":           (rule_cpp(TAINT_IN + "pattern-sinks:\n- pattern: Sink($X)\n- pattern: Qux($X)"), "[7, 16, 17]"),
+ "taint_assume_safe_functions": (rule_cpp(TAINT_IN + "pattern-sinks:\n- pattern: Sink($X)\n- pattern: Qux($X)\noptions:\n  taint_assume_safe_functions: true"), "[16]"),
+ "taint-sink-exact-true":   (rule_cpp(TAINT_IN + "pattern-sinks:\n- pattern: Qux(...)\n  exact: true\noptions:\n  taint_assume_safe_functions: true"), "[]"),
+ "taint-sink-exact-false":  (rule_cpp(TAINT_IN + "pattern-sinks:\n- pattern: Qux(...)\n  exact: false\noptions:\n  taint_assume_safe_functions: true"), "[16, 17]"),
+ "by-side-effect-only":     (rule_cpp("mode: taint\npattern-sources:\n- patterns:\n  - pattern: Escape($X)\n  - focus-metavariable: $X\n  by-side-effect: only\npattern-sinks:\n- pattern: Qux($X)\n- pattern: Log($X)"), "[19]"),
+ "by-side-effect-true":     (rule_cpp("mode: taint\npattern-sources:\n- patterns:\n  - pattern: Escape($X)\n  - focus-metavariable: $X\n  by-side-effect: true\npattern-sinks:\n- pattern: Qux($X)\n- pattern: Log($X)"), "[17, 19]"),
+ "symbolic_propagation":    (rule_cpp("pattern: Sink(Bar(Foo($X)))\noptions:\n  symbolic_propagation: true"), "[7]"),
+ "commutative_boolop":      (rule_cpp("pattern: if ($A > 5 && $B != nullptr) { ... }\noptions:\n  commutative_boolop: true"), "[9, 10]"),
+ "boolop-default":          (rule_cpp("pattern: if ($A > 5 && $B != nullptr) { ... }"), "[9]"),
+ "implicit_deep_exprstmt-off": (rule_cpp("pattern: Foo($X);\noptions:\n  implicit_deep_exprstmt: false"), "[21]"),
+ "deep-exprstmt-default":   (rule_cpp("pattern: Foo($X);"), "[5, 8, 21]"),
+ "const-global-propagation": (rule_cpp('pattern: Use("...")'), "?"),
+ "string-literal-arg":      (rule_cpp('pattern: printf("...")'), "[12]"),
+ "string-literal-varargs":  (rule_cpp('pattern: printf("...", ...)'), "[12, 13]"),
+ "severity-CRITICAL":       (rule_cpp("pattern: Sink($X)", HEAD_CPP.replace("WARNING", "CRITICAL")), "[7, 8]"),
+ "paths-exclude":           (rule_cpp("paths:\n  exclude: ['target.cpp']\npattern: Sink($X)"), "[] file excluded"),
+ "metavariable-regex":      (rule_cpp("patterns:\n- pattern: Check($N)\n- metavariable-regex:\n    metavariable: $N\n    regex: '^3'"), "[14]"),
+ "pattern-not-regex":       (rule_cpp("patterns:\n- pattern: Check($N)\n- pattern-not-regex: 'Check\\(10\\)'"), "[14]"),
+ "pattern-regex":           (rule_cpp("pattern-regex: 'Check\\(30\\)'"), "[14]"),
+ "metavariable-analysis-entropy": (rule_cpp("patterns:\n- pattern: const char* $N = $S;\n- metavariable-analysis:\n    analyzer: entropy\n    metavariable: $S"), "[3]"),
+ "fix-rendered":            (rule_cpp("pattern: Sink($X)\nfix: SafeSink($X)"), "fix 'SafeSink(b)'"),
+ "metavariable-comparison": (rule_cpp("patterns:\n- pattern: Check($N)\n- metavariable-comparison:\n    comparison: $N > 15"), "[14]"),
+ "metavariable-type":       (rule_cpp("patterns:\n- pattern: Qux($X)\n- metavariable-type:\n    metavariable: $X\n    type: const char*"), "?"),
+ "typed-metavariable":      (rule_cpp("pattern: Qux((const char* $X))"), "?"),
+}
+SYNTAX_CPP = {
+ "cpp11-auto-range-for":         "#include <vector>\nvoid f(std::vector<int> v) { for (auto x : v) { } Foo(1); }\n",
+ "cpp11-lambda":                 "void f() { auto l = [](int a) { return a + 1; }; Foo(1); }\n",
+ "cpp11-lambda-capture-mutable": "void f(int n) { auto l = [&, n](int a) mutable { return a + n; }; Foo(1); }\n",
+ "cpp11-rvalue-ref-move":        "#include <string>\nvoid f(std::string&& s) { auto t = std::move(s); Foo(1); }\n",
+ "cpp11-nullptr-constexpr":      "constexpr int N = 3; void f(int* p) { if (p == nullptr) { } Foo(1); }\n",
+ "cpp11-enum-class":             "enum class Color : int { Red, Green }; void f() { Color c = Color::Red; Foo(1); }\n",
+ "cpp11-static-assert-decltype": "template <typename T> void f(T x) { static_assert(sizeof(T) > 0, \"size\"); decltype(x) y = x; Foo(1); }\n",
+ "cpp11-variadic-template":      "template <typename... Ts> void g(Ts... args) { } void f() { g(1, 2.0, \"x\"); Foo(1); }\n",
+ "cpp11-override-final":         "struct B { virtual void m(); }; struct D final : B { void m() override { Foo(1); } };\n",
+ "cpp11-initializer-list":       "#include <vector>\nvoid f() { std::vector<int> v{1, 2, 3}; Foo(1); }\n",
+ "cpp11-raw-string":             "void f() { const char* s = R\"(raw \"text\")\"; Foo(1); }\n",
+ "cpp11-user-defined-literal":   "constexpr long operator\"\" _kb(unsigned long long n) { return n * 1024; } void f() { auto x = 4_kb; Foo(1); }\n",
+ "cpp11-default-delete-noexcept": "struct A { A() = default; A(const A&) = delete; void m() noexcept; }; void f() { Foo(1); }\n",
+ "cpp11-alias-template":         "#include <vector>\ntemplate <typename T> using Vec = std::vector<T>; void f() { Vec<int> v; Foo(1); }\n",
+ "cpp14-generic-lambda-auto":    "auto f() { auto l = [](auto x) { return x; }; Foo(1); return 0; }\n",
+ "cpp14-binary-literal-digit-sep": "void f() { int x = 0b1010'1010; int y = 1'000'000; Foo(1); }\n",
+ "cpp14-variable-template":      "template <typename T> constexpr T pi = T(3.14159); void f() { auto p = pi<double>; Foo(1); }\n",
+ "cpp17-structured-binding":     "#include <utility>\nvoid f(std::pair<int, int> p) { auto [a, b] = p; Foo(1); }\n",
+ "cpp17-if-init-constexpr-if":   "template <typename T> void f(T x) { if constexpr (sizeof(T) > 4) { } if (int n = 3; n > 2) { } Foo(1); }\n",
+ "cpp17-fold-expression":        "template <typename... Ts> auto sum(Ts... xs) { return (xs + ...); } void f() { Foo(1); }\n",
+ "cpp17-nested-namespace-inline-var": "namespace a::b { inline int v = 1; } void f() { Foo(1); }\n",
+ "cpp17-class-template-deduction": "#include <vector>\nvoid f() { std::vector v{1, 2}; Foo(1); }\n",
+ "cpp17-attributes":             "[[nodiscard]] int g(); void f([[maybe_unused]] int x) { switch (x) { case 1: [[fallthrough]]; case 2: break; } Foo(1); }\n",
+ "cpp20-concepts-requires":      "template <typename T> concept Num = requires(T a) { a + a; }; template <Num T> T twice(T x) { return x + x; } void f() { Foo(1); }\n",
+ "cpp20-spaceship":              "#include <compare>\nstruct P { int x; auto operator<=>(const P&) const = default; }; void f() { Foo(1); }\n",
+ "cpp20-designated-init":        "struct S { int a; int b; }; void f() { S s{.a = 1, .b = 2}; Foo(1); }\n",
+ "cpp20-coroutine-keywords":     "Task g() { co_await x; co_return; } void f() { Foo(1); }\n",
+ "cpp20-consteval-constinit":    "consteval int sq(int n) { return n * n; } constinit int z = sq(3); void f() { Foo(1); }\n",
+ "cpp20-lambda-template-params": "void f() { auto l = []<typename T>(T x) { return x; }; Foo(1); }\n",
+ "cpp20-modules":                "export module m;\nexport int g() { return 1; }\nvoid f() { Foo(1); }\n",
+ "cpp23-deducing-this-if-consteval": "struct S { void m(this S& self) { } }; void f() { if consteval { } Foo(1); }\n",
+ "cpp23-multidim-subscript":     "struct M { int operator[](int i, int j) { return 0; } }; void f(M m) { int x = m[1, 2]; Foo(1); }\n",
+ "cpp23-size-t-literal-suffix":  "void f() { auto n = 10uz; Foo(1); }\n",
+}
+SYNTAX_RULE_CPP = rule_cpp("pattern: Foo(1)")
+
+# ---- C (the C++ parser reads it; a few probes of its own) ---------------------------------------------------
+TARGET_C = """#include <string.h>
+void M(char* input, int n) {
+    char* a = Foo(input);
+    Sink(a);
+    Sink(Foo("lit"));
+    if (n > 5 && input != NULL) { Baz(n); }
+    Qux(input);
+    Foo(1);
+}
+"""
+HEAD_C = HEAD.replace("[csharp]", "[c]")
+def rule_c(body, head=HEAD_C):
+    return rule(body, head)
+RULES_C = {
+ "taint-default":           (rule_c(TAINT_IN + "pattern-sinks:\n- pattern: Sink($X)\n- pattern: Qux($X)"), "[4, 7]"),
+ "deep-exprstmt-default":   (rule_c("pattern: Foo($X);"), "[3, 5, 8]"),
+ "fix-rendered":            (rule_c("pattern: Sink($X)\nfix: SafeSink($X)"), "fix 'SafeSink(a)'"),
+ "paths-exclude":           (rule_c("paths:\n  exclude: ['target.c']\npattern: Sink($X)"), "[] file excluded"),
+}
+SYNTAX_C = {
+ "c99-designated-init-compound-literal": "struct P { int x, y; }; void f(void) { struct P p = { .x = 1, .y = 2 }; int *a = (int[]){1, 2}; Foo(1); }\n",
+ "c99-vla-restrict":                    "void f(int n, int * restrict p) { int a[n]; Foo(1); }\n",
+ "c11-generic-static-assert":           "#define T(x) _Generic((x), int: 1, default: 0)\n_Static_assert(sizeof(int) == 4, \"int\");\nvoid f(void) { Foo(1); }\n",
+ "c11-atomic-alignas":                  "#include <stdatomic.h>\n_Alignas(16) int buf[4]; _Atomic int counter; void f(void) { Foo(1); }\n",
+ "c-preprocessor-ifdef":                "#ifdef DEBUG\nint d = 1;\n#else\nint d = 0;\n#endif\nvoid f(void) { Foo(1); }\n",
+ "c-function-pointer-typedef":          "typedef int (*cb)(int); int apply(cb f) { return f(1); } void g(void) { Foo(1); }\n",
+ "c-goto-label-switch":                 "void f(int n) { switch (n) { case 1: goto done; default: break; } done: Foo(1); }\n",
+ "c-bitfield-union":                    "union U { int i; float f; }; struct B { unsigned a : 3; unsigned b : 5; }; void f(void) { Foo(1); }\n",
+}
+SYNTAX_RULE_C = rule_c("pattern: Foo(1)")
+
+LANGS = {
+ "csharp": {"ext": "cs", "target": TARGET, "rules": RULES, "syntax": SYNTAX, "syntax_rule": SYNTAX_RULE},
+ "cpp":    {"ext": "cpp", "target": TARGET_CPP, "rules": RULES_CPP, "syntax": SYNTAX_CPP, "syntax_rule": SYNTAX_RULE_CPP},
+ "c":      {"ext": "c", "target": TARGET_C, "rules": RULES_C, "syntax": SYNTAX_C, "syntax_rule": SYNTAX_RULE_C},
+}
+
 def short_err(e):
     t = e.get("type") or e.get("error_type") or ""
     if isinstance(t, (list, dict)): t = json.dumps(t)
     m = str(e.get("message") or e.get("long_msg") or e.get("short_msg") or "")
     return (str(t) + ": " + m.replace("\n", " "))[:110]
 
-def run_browser(rule_path, target_path):
-    """The vendored browser engine, driven through scripts/run_rule.mjs."""
+def run_browser(rule_path, target_path, lang="csharp"):
+    """The vendored browser engine, driven through scripts/run_rule.mjs (SEMGREP_WASM_DIST selects another dist/)."""
     try:
-        p = subprocess.run(["node", "scripts/run_rule.mjs", "--rule", str(rule_path), "--target", str(target_path)],
+        p = subprocess.run(["node", "scripts/run_rule.mjs", "--rule", str(rule_path), "--target", str(target_path), "--lang", lang],
                            cwd=REPO, capture_output=True, text=True, timeout=90)
     except subprocess.TimeoutExpired:
         return {"lines": None, "errors": ["timeout (90 s)"], "extra": {}}
@@ -148,11 +282,11 @@ def run_browser(rule_path, target_path):
     first = (d.get("matches") or [{}])[0].get("extra", {}) if d.get("matches") else {}
     return {"lines": lines, "errors": [short_err(e) for e in d.get("errors", [])], "extra": {"message": first.get("message"), "fix": first.get("fix")}}
 
-def run_cli(binary, rule_path, target_path, drop_metrics=False):
+def run_cli(binary, rule_path, target_path, drop_metrics=False, ext="cs"):
     """A native CLI (semgrep or opengrep). Opengrep has no telemetry and rejects --metrics."""
     with tempfile.TemporaryDirectory(prefix="probe-") as tmp:
-        shutil.copy(rule_path, Path(tmp) / "rule.yaml"); shutil.copy(target_path, Path(tmp) / "target.cs")
-        cmd = [binary, "scan", "--metrics=off", "--quiet", "--json", "--no-git-ignore", "--disable-version-check", "--config", "rule.yaml", "target.cs"]
+        shutil.copy(rule_path, Path(tmp) / "rule.yaml"); shutil.copy(target_path, Path(tmp) / f"target.{ext}")
+        cmd = [binary, "scan", "--metrics=off", "--quiet", "--json", "--no-git-ignore", "--disable-version-check", "--config", "rule.yaml", f"target.{ext}"]
         if drop_metrics:
             cmd.remove("--metrics=off")
         try:
@@ -184,6 +318,7 @@ def summarise(row, engines):
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("kind", nargs="?", default="all", choices=["rules", "syntax", "all"])
+    ap.add_argument("--lang", default="all", choices=["csharp", "cpp", "c", "all"], help="target language (default: all)")
     ap.add_argument("--only", help="run only probes whose name contains this substring")
     ap.add_argument("--emit", help="write one JSON object per probe to this file")
     ap.add_argument("--quiet", action="store_true", help="print only differences and the summary")
@@ -201,46 +336,49 @@ def main(argv=None) -> int:
     work = Path(tempfile.mkdtemp(prefix="dojo-probes-"))
     rows, differ = [], 0
     kinds = ["rules", "syntax"] if args.kind == "all" else [args.kind]
-    for kind in kinds:
-        cases = RULES if kind == "rules" else SYNTAX
-        print(f"\n--- {kind} ({len(cases)} probes)")
-        if kind == "rules":
-            tpath = work / "target.cs"
-            tpath.write_text(TARGET)
-        for name in cases:
-            if args.only and args.only not in name:
-                continue
-            rpath = work / f"{name}.yaml"
+    langs = list(LANGS) if args.lang == "all" else [args.lang]
+    for lang in langs:
+        L = LANGS[lang]
+        for kind in kinds:
+            cases = L["rules"] if kind == "rules" else L["syntax"]
+            print(f"\n--- {lang} {kind} ({len(cases)} probes)")
             if kind == "rules":
-                rule_text, expected = RULES[name]
-            else:
-                rule_text, expected = SYNTAX_RULE, "match the line holding Foo(1), no errors"
-                tpath = work / f"{name}.cs"
-                tpath.write_text(SYNTAX[name])
-            rpath.write_text(rule_text)
-            row = {"probe": name, "kind": kind, "expected": expected, "browser": run_browser(rpath, tpath)}
-            if engines["semgrep"]:
-                row["semgrep"] = run_cli("semgrep", rpath, tpath)
-            if engines["opengrep"]:
-                row["opengrep"] = run_cli("opengrep", rpath, tpath, drop_metrics=True)
-            row["verdict"] = summarise(row, engines)
-            rows.append(row)
-            if row["verdict"] == "DIFFERS":
-                differ += 1
-            if row["verdict"] == "DIFFERS" or not args.quiet:
-                def cell(r):
-                    if r is None:
-                        return "-"
-                    return "lines=" + json.dumps(r["lines"]) + (" ERR" if r["errors"] else "")
-                line = f"  {'ok  ' if row['verdict'] == 'ok' else row['verdict']}  {name:34s} browser={cell(row['browser'])}"
-                for e in ("semgrep", "opengrep"):
-                    if e in row:
-                        line += f"  {e}={cell(row[e])}"
-                print(line)
+                tpath = work / f"target.{L['ext']}"
+                tpath.write_text(L["target"])
+            for name in cases:
+                if args.only and args.only not in name:
+                    continue
+                rpath = work / f"{lang}-{name}.yaml"
+                if kind == "rules":
+                    rule_text, expected = cases[name]
+                else:
+                    rule_text, expected = L["syntax_rule"], "match the line holding Foo(1), no errors"
+                    tpath = work / f"{name}.{L['ext']}"
+                    tpath.write_text(cases[name])
+                rpath.write_text(rule_text)
+                row = {"probe": name, "lang": lang, "kind": kind, "expected": expected, "browser": run_browser(rpath, tpath, lang)}
+                if engines["semgrep"]:
+                    row["semgrep"] = run_cli("semgrep", rpath, tpath, ext=L["ext"])
+                if engines["opengrep"]:
+                    row["opengrep"] = run_cli("opengrep", rpath, tpath, drop_metrics=True, ext=L["ext"])
+                row["verdict"] = summarise(row, engines)
+                rows.append(row)
                 if row["verdict"] == "DIFFERS":
-                    for e in ("browser", "semgrep", "opengrep"):
-                        if e in row and row[e] and row[e]["errors"]:
-                            print(f"        {e} errors: {row[e]['errors'][0][:150]}")
+                    differ += 1
+                if row["verdict"] == "DIFFERS" or not args.quiet:
+                    def cell(r):
+                        if r is None:
+                            return "-"
+                        return "lines=" + json.dumps(r["lines"]) + (" ERR" if r["errors"] else "")
+                    line = f"  {'ok  ' if row['verdict'] == 'ok' else row['verdict']}  {name:34s} browser={cell(row['browser'])}"
+                    for e in ("semgrep", "opengrep"):
+                        if e in row:
+                            line += f"  {e}={cell(row[e])}"
+                    print(line)
+                    if row["verdict"] == "DIFFERS":
+                        for e in ("browser", "semgrep", "opengrep"):
+                            if e in row and row[e] and row[e]["errors"]:
+                                print(f"        {e} errors: {row[e]['errors'][0][:150]}")
 
     if args.emit:
         Path(args.emit).parent.mkdir(parents=True, exist_ok=True)

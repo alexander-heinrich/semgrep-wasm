@@ -1,21 +1,27 @@
 #!/usr/bin/env node
 // Runs the semantics suite (tests/semantics.json, expectations = current Semgrep CLI) through the browser
-// engine and lists every divergence. Usage: node scripts/semantics_check.mjs [--only NAME] [--dump NAME]
+// engine and lists every divergence. Usage: node scripts/semantics_check.mjs [--only NAME] [--dump NAME] [--emit PATH]
+// --emit writes every case's full result (matches with ranges, metavariables, fixes; errors) as JSON, for comparing builds.
 // A case may set `lang` (default csharp; picks the default target) and either `target`/`targetPath` or
 // `targets: [{path, text | file}]` — in the multi-target form `expect` maps each path to its matched lines and
 // `expectErrors` lists the paths that must appear in an error. `before: {target, targetPath?}` runs the rule on other
 // content at the same path first; the case then checks that nothing of it leaks into the real run.
-import { readFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { loadEngine } from '../dist/engine-node.mjs';
+import { pathToFileURL } from 'node:url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+// SEMGREP_WASM_DIST points the suite at another copy of dist/ (used to compare builds)
+const DIST = process.env.SEMGREP_WASM_DIST ? pathToFileURL(path.resolve(process.env.SEMGREP_WASM_DIST) + '/') : new URL('../dist/', import.meta.url);
+const { loadEngine } = await import(new URL('engine-node.mjs', DIST).href);
 
 const args = process.argv.slice(2);
 const argValue = (name) => (args.find((a) => a.startsWith(`${name}=`)) || '').slice(name.length + 1) || (args.includes(name) ? args[args.indexOf(name) + 1] : '');
 const only = argValue('--only');
 const dump = argValue('--dump');
+const emit = argValue('--emit');
+const emitted = [];
 const suite = JSON.parse(readFileSync(path.join(ROOT, 'tests', 'semantics.json'), 'utf8'));
 const DEFAULTS = {
   csharp: { text: readFileSync(path.join(ROOT, 'tests', 'target.cs'), 'utf8'), path: 'Demo/Svc.cs' },
@@ -56,6 +62,8 @@ for (const test of suite) {
   if (test.showMetavars && res.matches.length) extra.push(`metavars=${Object.keys(res.matches[0].extra.metavars || {}).join(',') || 'none'}`);
   console.log(`[${status.padEnd(13)}] ${test.name.padEnd(34)} got=${JSON.stringify(got)} want=${JSON.stringify(test.expect ?? 'error')} ${res.ms}ms${errs.length ? ' errors=' + JSON.stringify(errs).slice(0, 160) : ''}${extra.length ? ' ' + extra.join(' ') : ''}`);
   if (dump === test.name && res.raw) console.log(JSON.stringify(res.raw).slice(0, 3000));
+  if (emit) emitted.push({ name: test.name, status, ms: res.ms, matches: res.matches.map((m) => ({ rule_id: m.rule_id, path: m.location.path, start: m.location.start, end: m.location.end, message: m.extra.message, fix: m.extra.fix, metavars: Object.fromEntries(Object.entries(m.extra.metavars || {}).map(([k, v]) => [k, v.abstract_content])) })), errors: res.errors.map((e) => ({ type: Array.isArray(e.error_type) ? e.error_type[0] : e.error_type, path: e.path, message: e.message })) });
 }
+if (emit) writeFileSync(emit, JSON.stringify(emitted, null, 1) + '\n');
 console.log(`\n${pass} passed, ${fail} failed`);
 finish(fail ? 1 : 0);

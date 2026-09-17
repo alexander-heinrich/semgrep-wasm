@@ -1082,7 +1082,7 @@
  },
  {
   "name": "cpp-plain-call",
-  "note": "C++ smoke tests (expectations from the CLI)",
+  "note": "C++ cases (expectations from the CLI; the target is tests/target.cpp)",
   "lang": "cpp",
   "rule": {
    "pattern": "strcpy(...)"
@@ -1128,7 +1128,8 @@
    "pattern": "$X * 2"
   },
   "expect": [
-   25
+   25,
+   66
   ]
  },
  {
@@ -1156,14 +1157,468 @@
   ]
  },
  {
+  "name": "cpp-member-call-cstr",
+  "lang": "cpp",
+  "rule": {
+   "pattern": "$X.c_str()"
+  },
+  "expect": [
+   17,
+   36
+  ]
+ },
+ {
+  "name": "cpp-call-with-member-call",
+  "lang": "cpp",
+  "rule": {
+   "pattern": "fetch($U.c_str())"
+  },
+  "expect": [
+   36
+  ]
+ },
+ {
+  "name": "cpp-method-definition",
+  "lang": "cpp",
+  "rule": {
+   "pattern": "std::string get(...) { ... }"
+  },
+  "expect": [
+   34
+  ]
+ },
+ {
+  "name": "cpp-ctor-init-list",
+  "lang": "cpp",
+  "rule": {
+   "pattern": "explicit $C(const std::string& $A) : $F($A) {}"
+  },
+  "expect": [
+   33
+  ]
+ },
+ {
+  "name": "cpp-template-function",
+  "note": "no match in the CLI: the pattern does not name the template header",
+  "lang": "cpp",
+  "rule": {
+   "pattern": "T $F(const std::vector<T>& $XS) { ... }"
+  },
+  "expect": []
+ },
+ {
+  "name": "cpp-range-for",
+  "lang": "cpp",
+  "rule": {
+   "pattern": "for (const auto& $X : $XS) { ... }"
+  },
+  "expect": [
+   47
+  ]
+ },
+ {
+  "name": "cpp-lambda-literal",
+  "lang": "cpp",
+  "rule": {
+   "pattern": "[](int $A, int $B) { return $A + $B; }"
+  },
+  "expect": [
+   54
+  ]
+ },
+ {
+  "name": "cpp-nullptr-compare",
+  "lang": "cpp",
+  "rule": {
+   "pattern": "if ($P == nullptr) { ... }"
+  },
+  "expect": [
+   56
+  ]
+ },
+ {
+  "name": "cpp-classic-for",
+  "lang": "cpp",
+  "rule": {
+   "pattern": "for (int $I = 0; $I < $N; $I++) { ... }"
+  },
+  "expect": [
+   59
+  ]
+ },
+ {
+  "name": "cpp-deref-args",
+  "lang": "cpp",
+  "rule": {
+   "pattern": "add(*$P, $R)"
+  },
+  "expect": [
+   55
+  ]
+ },
+ {
+  "name": "cpp-ellipsis-args",
+  "lang": "cpp",
+  "rule": {
+   "pattern": "memcpy(...)"
+  },
+  "expect": [
+   64
+  ]
+ },
+ {
+  "name": "cpp-focus-metavariable",
+  "lang": "cpp",
+  "rule": {
+   "patterns": [
+    {
+     "pattern": "memcpy($D, $S, $N)"
+    },
+    {
+     "focus-metavariable": "$S"
+    }
+   ]
+  },
+  "expect": [
+   64
+  ]
+ },
+ {
+  "name": "cpp-pattern-inside-function",
+  "lang": "cpp",
+  "rule": {
+   "patterns": [
+    {
+     "pattern": "return $X;"
+    },
+    {
+     "pattern-inside": "int compute(...) { ... }"
+    }
+   ]
+  },
+  "expect": [
+   54,
+   57,
+   66
+  ]
+ },
+ {
+  "name": "cpp-pattern-not-inside",
+  "note": "every printf sits inside copy_name",
+  "lang": "cpp",
+  "rule": {
+   "patterns": [
+    {
+     "pattern": "printf(...)"
+    },
+    {
+     "pattern-not-inside": "void copy_name(...) { ... }"
+    }
+   ]
+  },
+  "expect": []
+ },
+ {
+  "name": "cpp-malloc-then-free",
+  "lang": "cpp",
+  "rule": {
+   "patterns": [
+    {
+     "pattern": "free($P)"
+    },
+    {
+     "pattern-inside": "$P = (char*)malloc(...);\n...\n"
+    }
+   ]
+  },
+  "expect": [
+   65
+  ]
+ },
+ {
+  "name": "cpp-taint-malloc-free",
+  "lang": "cpp",
+  "rule": {
+   "mode": "taint",
+   "pattern-sources": [
+    {
+     "pattern": "malloc(...)"
+    }
+   ],
+   "pattern-sinks": [
+    {
+     "pattern": "free($X)"
+    }
+   ]
+  },
+  "expect": [
+   65
+  ]
+ },
+ {
+  "name": "cpp-metavariable-regex-str",
+  "lang": "cpp",
+  "rule": {
+   "patterns": [
+    {
+     "pattern": "$F($T)"
+    },
+    {
+     "metavariable-regex": {
+      "metavariable": "$F",
+      "regex": "^str"
+     }
+    }
+   ]
+  },
+  "expect": [
+   62
+  ]
+ },
+ {
+  "name": "cpp-metavariable-comparison",
+  "lang": "cpp",
+  "rule": {
+   "patterns": [
+    {
+     "pattern": "SQUARE($N)"
+    },
+    {
+     "metavariable-comparison": {
+      "comparison": "$N > 3"
+     }
+    }
+   ]
+  },
+  "expect": [
+   70
+  ]
+ },
+ {
+  "name": "cpp-macro-call",
+  "lang": "cpp",
+  "rule": {
+   "pattern": "SQUARE($X)"
+  },
+  "expect": [
+   70
+  ]
+ },
+ {
+  "name": "cpp-define-regex",
+  "lang": "cpp",
+  "rule": {
+   "pattern-regex": "#define SQUARE"
+  },
+  "expect": [
+   69
+  ]
+ },
+ {
+  "name": "cpp-field-declaration",
+  "lang": "cpp",
+  "rule": {
+   "pattern": "std::string $F;"
+  },
+  "expect": [
+   40
+  ]
+ },
+ {
+  "name": "cpp-plus-one",
+  "lang": "cpp",
+  "rule": {
+   "pattern": "$X + 1"
+  },
+  "expect": [
+   63,
+   64
+  ]
+ },
+ {
+  "name": "cpp-namespace-block",
+  "lang": "cpp",
+  "rule": {
+   "pattern": "namespace app::net { ... }"
+  },
+  "expect": [
+   30
+  ]
+ },
+ {
+  "name": "cpp-typed-metavariable",
+  "note": "no match in the CLI for a typed metavariable inside a call",
+  "lang": "cpp",
+  "rule": {
+   "pattern": "compute((int* $P), $R, $T)"
+  },
+  "expect": []
+ },
+ {
+  "name": "cpp-fix-strcpy",
+  "note": "fix rendered with the bound metavariables",
+  "lang": "cpp",
+  "rule": {
+   "pattern": "strcpy($D, $S)",
+   "fix": "strncpy($D, $S, sizeof($D))"
+  },
+  "checkFix": true,
+  "expect": [
+   8
+  ]
+ },
+ {
+  "name": "cpp-fix-regex",
+  "lang": "cpp",
+  "rule": {
+   "pattern": "system($C)",
+   "fix-regex": {
+    "regex": "system",
+    "replacement": "run_checked"
+   }
+  },
+  "checkFix": true,
+  "expect": [
+   17,
+   18,
+   19
+  ]
+ },
+ {
+  "name": "cpp-pattern-either",
+  "lang": "cpp",
+  "rule": {
+   "pattern-either": [
+    {
+     "pattern": "malloc(...)"
+    },
+    {
+     "pattern": "free(...)"
+    }
+   ]
+  },
+  "expect": [
+   63,
+   65
+  ]
+ },
+ {
+  "name": "cpp-metavariable-pattern",
+  "lang": "cpp",
+  "rule": {
+   "patterns": [
+    {
+     "pattern": "system($ARG)"
+    },
+    {
+     "metavariable-pattern": {
+      "metavariable": "$ARG",
+      "pattern": "$X.c_str()"
+     }
+    }
+   ]
+  },
+  "expect": [
+   17
+  ]
+ },
+ {
+  "name": "cpp-deep-expression-in-return",
+  "lang": "cpp",
+  "rule": {
+   "pattern": "return system(...);"
+  },
+  "expect": [
+   19
+  ]
+ },
+ {
+  "name": "cpp-statement-sequence",
+  "lang": "cpp",
+  "rule": {
+   "pattern": "$D = (char*)malloc(...);\nmemcpy($D, ...);"
+  },
+  "expect": [
+   63
+  ]
+ },
+ {
   "name": "c-plain-call",
-  "note": "C is parsed by the C++ parser",
+  "note": "C cases: the C++ parser reads C (the target is tests/target.c)",
   "lang": "c",
   "rule": {
    "pattern": "strcpy(...)"
   },
   "expect": [
    4
+  ]
+ },
+ {
+  "name": "c-struct-init",
+  "lang": "c",
+  "rule": {
+   "pattern": "struct point $P = { ... };"
+  },
+  "expect": [
+   9
+  ]
+ },
+ {
+  "name": "c-function-pointer-decl",
+  "lang": "c",
+  "rule": {
+   "pattern": "int (*$OP)(int, int) = $F;"
+  },
+  "expect": [
+   10
+  ]
+ },
+ {
+  "name": "c-return-inside-if",
+  "lang": "c",
+  "rule": {
+   "patterns": [
+    {
+     "pattern": "return $X;"
+    },
+    {
+     "pattern-inside": "if (...) { ... }"
+    }
+   ]
+  },
+  "expect": [
+   12
+  ]
+ },
+ {
+  "name": "c-taint-argv-strlen",
+  "lang": "c",
+  "rule": {
+   "mode": "taint",
+   "pattern-sources": [
+    {
+     "pattern": "argv"
+    }
+   ],
+   "pattern-sinks": [
+    {
+     "pattern": "strlen(...)"
+    }
+   ]
+  },
+  "expect": [
+   14
+  ]
+ },
+ {
+  "name": "c-two-arg-call",
+  "lang": "c",
+  "rule": {
+   "pattern": "$F($A, $B)"
+  },
+  "expect": [
+   4,
+   12
   ]
  }
 ]

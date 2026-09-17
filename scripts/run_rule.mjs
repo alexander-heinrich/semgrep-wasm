@@ -7,7 +7,10 @@
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import yaml from 'js-yaml';
-import { loadEngine } from '../dist/engine-node.mjs';
+import { pathToFileURL } from 'node:url';
+// SEMGREP_WASM_DIST points at another copy of dist/ (used to compare builds)
+const DIST = process.env.SEMGREP_WASM_DIST ? pathToFileURL(path.resolve(process.env.SEMGREP_WASM_DIST) + '/') : new URL('../dist/', import.meta.url);
+const { loadEngine } = await import(new URL('engine-node.mjs', DIST).href);
 
 const args = process.argv.slice(2);
 const argValue = (name) => (args.find((a) => a.startsWith(`${name}=`)) || '').slice(name.length + 1) || (args.includes(name) ? args[args.indexOf(name) + 1] : '');

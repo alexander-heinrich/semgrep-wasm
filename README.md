@@ -76,19 +76,20 @@ Reference is Semgrep 1.172.0; Opengrep 1.29.0 gives identical answers. Every sui
 only language verified in depth: the rule-syntax evidence exercises language-independent engine code and
 largely transfers, the syntax evidence covers the C# grammar and its translation only and transfers to no
 other language. Python has a smoke test only (three cases in the semantics suite, checked against the
-same CLI), C++ has seven (including C through the same parser and the `c++` spelling); further cases cover
-multi-target runs, an unsupported language and path reuse across runs.
+same CLI). C++ has 36 semantics cases and 61 differential probes (28 rule keys on a C++ target, 33 C++11–23
+syntax samples), and C, read by the same parser, 6 cases and 12 probes; further cases cover multi-target runs,
+an unsupported language and path reuse across runs.
 
 ```sh
-node scripts/semantics_check.mjs        # 83 pattern-semantics checks against stored CLI-derived answers
-python3 scripts/engine_probes.py        # 60 differential probes: this build vs semgrep vs opengrep on PATH
+node scripts/semantics_check.mjs        # 118 pattern-semantics checks against stored CLI-derived answers
+python3 scripts/engine_probes.py        # 133 differential probes: this build vs semgrep vs opengrep on PATH (--lang cpp for one language)
 ```
 
 | suite | result |
 |---|---|
-| `scripts/semantics_check.mjs`, 67 C# cases + 3 Python + 7 C++/C + 4 multi-target + 1 unsupported language + 1 path reuse | 83/83 |
-| `scripts/engine_probes.py rules`, 31 rule-key probes | identical to the CLI, including error cases |
-| `scripts/engine_probes.py syntax`, 29 C# 9–14 samples | identical, including the same partial-parse errors |
+| `scripts/semantics_check.mjs`, 67 C# cases + 3 Python + 36 C++ + 6 C + 4 multi-target + 1 unsupported language + 1 path reuse | 118/118 |
+| `scripts/engine_probes.py rules`, 31 C# + 28 C++ + 4 C rule-key probes | identical to the CLI, including error cases |
+| `scripts/engine_probes.py syntax`, 29 C# 9–14, 33 C++11–23 and 8 C99/C11 samples | identical, including the same parse errors |
 
 Recorded probe output is committed as `tests/probe-results.jsonl`. Ten of the semantics expectations
 were originally wrong and were re-derived from the CLI; the engine had been right. Quirks that remain
@@ -165,6 +166,6 @@ The full investigation, including the retired 2023 engine's gap table, is in `do
 | `dist/` | the eleven built files, the LGPL licence text, `SHA256SUMS`, `VERSIONS.md`, and the three loader files: `engine-output.js` (CLI JSON → simple shape), `engine-node.mjs` (Node loader), `semgrep-worker.js` (browser worker). Copy this directory as a whole. |
 | `build/` | `Dockerfile`, `build.sh`, `install.sh`, `flatten_literals.mjs` (caps literal nesting for WebKit workers), `checksums.sh` (refreshes `dist/SHA256SUMS` after a loader edit) |
 | `scripts/` | `run_rule.mjs`, `semantics_check.mjs`, `engine_probes.py` |
-| `tests/` | the 83 semantics cases and their C#, Python, C++ and C targets, the recorded probe results |
+| `tests/` | the 118 semantics cases and their C#, Python, C++ and C targets, the recorded probe results |
 | `docs/` | `RESULTS.md`, the feasibility investigation and the gap table of the 2023 packages |
 | `spike/` | the 2023 harness (Node and browser smoke tests, runtime shims) that `docs/RESULTS.md` describes |
