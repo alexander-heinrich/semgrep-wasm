@@ -1079,5 +1079,91 @@
   "expect": [
    1
   ]
+ },
+ {
+  "name": "cpp-plain-call",
+  "note": "C++ smoke tests (expectations from the CLI)",
+  "lang": "cpp",
+  "rule": {
+   "pattern": "strcpy(...)"
+  },
+  "expect": [
+   8
+  ]
+ },
+ {
+  "name": "cpp-single-arg-printf",
+  "lang": "cpp",
+  "rule": {
+   "pattern": "printf($FMT)"
+  },
+  "expect": [
+   10
+  ]
+ },
+ {
+  "name": "cpp-taint-getenv-system",
+  "lang": "cpp",
+  "rule": {
+   "mode": "taint",
+   "pattern-sources": [
+    {
+     "pattern": "getenv(...)"
+    }
+   ],
+   "pattern-sinks": [
+    {
+     "pattern": "system(...)"
+    }
+   ]
+  },
+  "expect": [
+   19
+  ]
+ },
+ {
+  "name": "cpp-times-two",
+  "lang": "cpp",
+  "rule": {
+   "pattern": "$X * 2"
+  },
+  "expect": [
+   25
+  ]
+ },
+ {
+  "name": "cpp-string-concat",
+  "lang": "cpp",
+  "rule": {
+   "pattern": "\"...\" + $X"
+  },
+  "expect": [
+   16
+  ]
+ },
+ {
+  "name": "cpp-plus-plus-alias",
+  "note": "the rule may spell the language c++",
+  "lang": "cpp",
+  "rule": {
+   "languages": [
+    "c++"
+   ],
+   "pattern": "strncpy(...)"
+  },
+  "expect": [
+   9
+  ]
+ },
+ {
+  "name": "c-plain-call",
+  "note": "C is parsed by the C++ parser",
+  "lang": "c",
+  "rule": {
+   "pattern": "strcpy(...)"
+  },
+  "expect": [
+   4
+  ]
  }
 ]

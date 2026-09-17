@@ -7,14 +7,14 @@ TAG="${1:-1.81.0}"
 DEST=../dist
 test -f out/engine/index.mjs || { echo "out/engine/index.mjs missing — run build.sh first" >&2; exit 1; }
 mkdir -p "$DEST"
-rm -f "$DEST"/engine-[0-9]*.mjs "$DEST"/engine-[0-9]*.cjs "$DEST"/csharp-*.mjs "$DEST"/csharp-*.cjs "$DEST"/csharp-*.wasm \
-      "$DEST"/python-*.mjs "$DEST"/python-*.cjs "$DEST"/python-*.wasm "$DEST"/semgrep-parser.wasm
+rm -f "$DEST"/engine-[0-9]*.mjs "$DEST"/engine-[0-9]*.cjs "$DEST"/semgrep-parser.wasm
+for lang in csharp python cpp; do rm -f "$DEST/$lang"-*.mjs "$DEST/$lang"-*.cjs "$DEST/$lang"-*.wasm; done
 cp out/engine/index.mjs "$DEST/engine-$TAG.mjs"
 cp out/engine/index.cjs "$DEST/engine-$TAG.cjs"
-for lang in csharp python; do
+for lang in csharp python cpp; do
   cp "out/$lang/index.mjs" "$DEST/$lang-$TAG.mjs"
   cp "out/$lang/index.cjs" "$DEST/$lang-$TAG.cjs"
   cp "out/$lang/semgrep-parser.wasm" "$DEST/$lang-$TAG.wasm"
 done
-sh "$(dirname "$0")/checksums.sh"
-(cd "$DEST" && ls -la engine-* csharp-* python-*)
+sh ./checksums.sh
+(cd "$DEST" && ls -la engine-* csharp-* python-* cpp-*)

@@ -8,6 +8,7 @@
     "run-rule": "node scripts/run_rule.mjs"
   },
   "devDependencies": {
+    "@codemirror/lang-cpp": "^6.0.3",
     "js-yaml": "^4.1.0"
   },
   "license": "MIT",

@@ -8,6 +8,7 @@ This directory is `dist/` of https://github.com/alexander-heinrich/Semgrep-WASM.
 | engine-1.81.0.mjs / .cjs | js/engine dist/index.mjs, dist/index.cjs (libpcre, libpcre2, libyaml inlined as wasm) | LGPL-2.1 |
 | csharp-1.81.0.mjs / .cjs / .wasm | js/languages/csharp dist/index.mjs, dist/index.cjs, dist/semgrep-parser.wasm | LGPL-2.1 |
 | python-1.81.0.mjs / .cjs / .wasm | js/languages/python (same layout) | LGPL-2.1 |
+| cpp-1.81.0.mjs / .cjs / .wasm | js/languages/cpp (same layout; parses C++ and C) | LGPL-2.1 |
 
 The `.mjs` files and the `.wasm` side-cars are what a browser loads (`semgrep-worker.js` is a worker that does
 so); the `.cjs` files are for Node (`engine-node.mjs`); `engine-output.js` converts the engine's CLI-shaped JSON

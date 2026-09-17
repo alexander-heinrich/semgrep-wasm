@@ -31,8 +31,9 @@ Nothing newer can be built this way. This is a one-time reconstruction, not a tr
 **In a browser.** Load the engine and a parser in a module Web Worker; `dist/semgrep-worker.js` is a
 complete example. It answers `{type:'run', id, rules, lang, targets: [{path, text}]}` messages with
 `{type:'result', id, matches, errors, ms}` — one engine call for all the targets, `lang` defaulting to
-`csharp`, reported paths as given (the single-file form `target` + `targetPath` still works). Underneath,
-the parser's WebAssembly side-car is passed explicitly:
+`csharp`, reported paths as given (the single-file form `target` + `targetPath` still works). The C# and
+Python parsers load at start; the C++ parser (which also reads C) is imported the first time a run asks for
+it, announced by a `progress` message. Underneath, the parser's WebAssembly side-car is passed explicitly:
 
 ```js
 const { EngineFactory } = await import('./dist/engine-1.81.0.mjs');
@@ -65,8 +66,9 @@ node scripts/run_rule.mjs --rule rule.yaml --target Program.cs                 #
 node scripts/run_rule.mjs --rule rule.yaml --target app.py --lang python
 ```
 
-Sizes: engine 6.4 MB, C# parser 3.4 MB plus 5.7 MB of WebAssembly, Python parser 3.8 MB plus 0.4 MB.
-Engine and both parsers are ready about 540 ms after a worker starts; a rule run takes 5 to 70 ms.
+Sizes: engine 6.4 MB, C# parser 3.4 MB plus 5.7 MB of WebAssembly, Python parser 3.8 MB plus 0.4 MB,
+C++ parser 5.2 MB plus 3.9 MB (fetched on first use). Engine, C# and Python are ready about 540 ms after a
+worker starts; a rule run takes 5 to 70 ms.
 
 ## Verifying it
 
@@ -74,16 +76,17 @@ Reference is Semgrep 1.172.0; Opengrep 1.29.0 gives identical answers. Every sui
 only language verified in depth: the rule-syntax evidence exercises language-independent engine code and
 largely transfers, the syntax evidence covers the C# grammar and its translation only and transfers to no
 other language. Python has a smoke test only (three cases in the semantics suite, checked against the
-same CLI); further cases cover multi-target runs, an unsupported language and path reuse across runs.
+same CLI), C++ has seven (including C through the same parser and the `c++` spelling); further cases cover
+multi-target runs, an unsupported language and path reuse across runs.
 
 ```sh
-node scripts/semantics_check.mjs        # 76 pattern-semantics checks against stored CLI-derived answers
+node scripts/semantics_check.mjs        # 83 pattern-semantics checks against stored CLI-derived answers
 python3 scripts/engine_probes.py        # 60 differential probes: this build vs semgrep vs opengrep on PATH
 ```
 
 | suite | result |
 |---|---|
-| `scripts/semantics_check.mjs`, 67 C# cases + 3 Python + 4 multi-target + 1 unsupported language + 1 path reuse | 76/76 |
+| `scripts/semantics_check.mjs`, 67 C# cases + 3 Python + 7 C++/C + 4 multi-target + 1 unsupported language + 1 path reuse | 83/83 |
 | `scripts/engine_probes.py rules`, 31 rule-key probes | identical to the CLI, including error cases |
 | `scripts/engine_probes.py syntax`, 29 C# 9–14 samples | identical, including the same partial-parse errors |
 
@@ -101,8 +104,8 @@ sh build/install.sh      # → dist/ under versioned names, SHA256SUMS refreshed
 ```
 
 Needs Docker (Colima works), about 15 GB of image space, and roughly 15 minutes on an Apple-silicon
-Mac. Only the engine and the C# and Python parsers are built; upstream builds all 33 languages, and
-adding one here means naming it in the Dockerfile.
+Mac. Only the engine and the C#, Python and C++ parsers are built; upstream builds all 33 languages, and
+adding one here means naming it in the Dockerfile, `build/install.sh` and `build/checksums.sh`.
 
 `build/Dockerfile` mirrors the upstream CI workflow `.github/workflows/build-test-javascript.yml` at the
 tag, in three stages:
@@ -152,9 +155,9 @@ The full investigation, including the retired 2023 engine's gap table, is in `do
 
 | path | what |
 |---|---|
-| `dist/` | the eight built files, the LGPL licence text, `SHA256SUMS`, `VERSIONS.md`, and the three loader files: `engine-output.js` (CLI JSON → simple shape), `engine-node.mjs` (Node loader), `semgrep-worker.js` (browser worker). Copy this directory as a whole. |
+| `dist/` | the eleven built files, the LGPL licence text, `SHA256SUMS`, `VERSIONS.md`, and the three loader files: `engine-output.js` (CLI JSON → simple shape), `engine-node.mjs` (Node loader), `semgrep-worker.js` (browser worker). Copy this directory as a whole. |
 | `build/` | `Dockerfile`, `build.sh`, `install.sh`, `checksums.sh` (refreshes `dist/SHA256SUMS` after a loader edit) |
 | `scripts/` | `run_rule.mjs`, `semantics_check.mjs`, `engine_probes.py` |
-| `tests/` | the 76 semantics cases and their C# and Python targets, the recorded probe results |
+| `tests/` | the 83 semantics cases and their C#, Python, C++ and C targets, the recorded probe results |
 | `docs/` | `RESULTS.md`, the feasibility investigation and the gap table of the 2023 packages |
 | `spike/` | the 2023 harness (Node and browser smoke tests, runtime shims) that `docs/RESULTS.md` describes |

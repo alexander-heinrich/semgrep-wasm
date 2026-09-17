@@ -20,6 +20,8 @@ const suite = JSON.parse(readFileSync(path.join(ROOT, 'tests', 'semantics.json')
 const DEFAULTS = {
   csharp: { text: readFileSync(path.join(ROOT, 'tests', 'target.cs'), 'utf8'), path: 'Demo/Svc.cs' },
   python: { text: readFileSync(path.join(ROOT, 'tests', 'target.py'), 'utf8'), path: 'app/main.py' },
+  cpp: { text: readFileSync(path.join(ROOT, 'tests', 'target.cpp'), 'utf8'), path: 'src/main.cpp' },
+  c: { text: readFileSync(path.join(ROOT, 'tests', 'target.c'), 'utf8'), path: 'src/main.c' },
 };
 const sortedLines = (ms) => [...new Set(ms.map((m) => m.location.start.line))].sort((a, b) => a - b);
 const byPath = (ms) => Object.fromEntries([...new Set(ms.map((m) => m.location.path))].sort().map((p) => [p, sortedLines(ms.filter((m) => m.location.path === p))]));

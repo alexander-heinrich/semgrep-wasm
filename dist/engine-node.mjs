@@ -13,10 +13,12 @@ export const FILES = {
   engine: 'engine-1.81.0.cjs',
   csharp: 'csharp-1.81.0.cjs', csharpWasm: 'csharp-1.81.0.wasm',
   python: 'python-1.81.0.cjs', pythonWasm: 'python-1.81.0.wasm',
+  cpp: 'cpp-1.81.0.cjs', cppWasm: 'cpp-1.81.0.wasm',
 };
+const PARSERS = ['csharp', 'python', 'cpp']; // the C++ parser also parses C
 
 /**
- * Loads engine + C# + Python parsers. js_of_ocaml captures the working directory when a bundle loads and
+ * Loads the engine and the C#, Python and C++ parsers. js_of_ocaml captures the working directory when a bundle loads and
  * resolves relative paths there — exactly like the browser's pseudo-filesystem — so the loader chdirs into
  * a scratch directory first; `paths:` globs then see the same target path as the CLI.
  */
@@ -27,11 +29,11 @@ export async function loadEngine({ verbose = false } = {}) {
   const require = createRequire(import.meta.url);
   const { EngineFactory } = require(path.join(VENDOR, FILES.engine));
   const engine = await EngineFactory();
-  const cs = require(path.join(VENDOR, FILES.csharp));
-  engine.addParser(await cs.ParserFactory(path.join(VENDOR, FILES.csharpWasm)));
-  const py = require(path.join(VENDOR, FILES.python));
-  engine.addParser(await py.ParserFactory(path.join(VENDOR, FILES.pythonWasm)));
-  if (verbose) console.error(`engine loaded; parsers: ${['csharp', 'python'].filter((l) => engine.hasParser(l)).join(', ')}`);
+  for (const lang of PARSERS) {
+    const mod = require(path.join(VENDOR, FILES[lang]));
+    engine.addParser(await mod.ParserFactory(path.join(VENDOR, FILES[lang + 'Wasm'])));
+  }
+  if (verbose) console.error(`engine loaded; parsers: ${PARSERS.filter((l) => engine.hasParser(l)).join(', ')}`);
 
   // Every run gets its own directory (the engine caches file contents by path, see layoutTargets); reported
   // paths are mapped back to the names given. A `paths:` glob such as tests/** still applies: Semgrep matches

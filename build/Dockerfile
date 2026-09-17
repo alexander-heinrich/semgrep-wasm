@@ -6,7 +6,8 @@
 #   stage "wasm":  emscripten 3.1.51 compiles libpcre/libpcre2/libyaml/tree-sitter parsers to wasm
 #                  and esbuild bundles engine + parsers
 #   stage "export": just the dist/ directories
-# Only the engine and the C# and Python parsers are built (Python is needed for metavariable-comparison).
+# Only the engine and the C#, Python and C++ parsers are built (Python is also needed for metavariable-comparison;
+# the C++ parser serves C as well).
 ARG SEMGREP_TAG=v1.81.0
 # opam-repository snapshot from the v1.81.0 release day (2024-07-24): reproduces the dependency universe of the CI build
 ARG OPAM_REPO_SHA=4f54a686f4935d5a27d6746496f2c422170bfd9a
@@ -38,7 +39,7 @@ RUN eval "$(opam env)" \
  && cd libs/ocaml-tree-sitter-core && ./configure && ./scripts/install-tree-sitter-lib
 RUN eval "$(opam env)" && opam install -y --deps-only ./ ./libs/ocaml-tree-sitter-core/tree-sitter.opam
 # build-semgrep-jsoo, restricted to what the site needs
-RUN eval "$(opam env)" && dune build js/engine js/languages/csharp js/languages/python --profile=release
+RUN eval "$(opam env)" && dune build js/engine js/languages/csharp js/languages/python js/languages/cpp --profile=release
 # keep only the js_of_ocaml outputs so the next stage copies a small tree
 RUN mkdir -p /home/opam/jsoo && cd _build/default/js \
  && find . -name '*.bc.js' | cpio -pdm /home/opam/jsoo \
@@ -54,10 +55,11 @@ FROM wasm-libs AS wasm
 # npm >= 7 runs binaries as the owner of the working directory when invoked as root; the tree copied from
 # the ocaml stage is owned by uid 1000, so `npx esbuild` could not write into root-owned dist/ directories.
 RUN chown -R root:root js && make -C js/engine build
-RUN make -C js/languages build-csharp build-python
-RUN ls -la js/engine/dist js/languages/csharp/dist js/languages/python/dist
+RUN make -C js/languages build-csharp build-python build-cpp
+RUN ls -la js/engine/dist js/languages/csharp/dist js/languages/python/dist js/languages/cpp/dist
 
 FROM scratch AS export
 COPY --from=wasm /home/opam/semgrep/js/engine/dist /engine
 COPY --from=wasm /home/opam/semgrep/js/languages/csharp/dist /csharp
 COPY --from=wasm /home/opam/semgrep/js/languages/python/dist /python
+COPY --from=wasm /home/opam/semgrep/js/languages/cpp/dist /cpp
