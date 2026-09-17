@@ -116,6 +116,13 @@ tag, in three stages:
 | `wasm-libs` | `emscripten/emsdk:3.1.51` | compile PCRE 8.45, PCRE2 10.43 and libyaml to WebAssembly | ~5 min |
 | `wasm` → `export` | same | compile the tree-sitter parsers to WebAssembly, bundle everything with esbuild, export the `dist/` directories | ~1 min |
 
+`build/install.sh` also runs `build/flatten_literals.mjs` over the bundles: js_of_ocaml emits OCaml lists and
+constant values as nested array literals, up to 313 levels deep in the C++ parser, and JavaScriptCore's
+bytecode generator recurses once per level. Inside a WebKit worker, whose stack holds only about 4 000
+frames, that bundle failed to evaluate ("Maximum call stack size exceeded"; the C# bundle, at 272 levels,
+still passed). The script rewrites every literal nested deeper than 24 levels into a flat token list that a
+small helper at the top of the bundle turns back into the same arrays on load, preserving evaluation order.
+
 ### The obstacles, in the order they appeared
 
 Each one blocked the next, which is why building a two-year-old tree today takes a recipe rather than a
@@ -156,7 +163,7 @@ The full investigation, including the retired 2023 engine's gap table, is in `do
 | path | what |
 |---|---|
 | `dist/` | the eleven built files, the LGPL licence text, `SHA256SUMS`, `VERSIONS.md`, and the three loader files: `engine-output.js` (CLI JSON → simple shape), `engine-node.mjs` (Node loader), `semgrep-worker.js` (browser worker). Copy this directory as a whole. |
-| `build/` | `Dockerfile`, `build.sh`, `install.sh`, `checksums.sh` (refreshes `dist/SHA256SUMS` after a loader edit) |
+| `build/` | `Dockerfile`, `build.sh`, `install.sh`, `flatten_literals.mjs` (caps literal nesting for WebKit workers), `checksums.sh` (refreshes `dist/SHA256SUMS` after a loader edit) |
 | `scripts/` | `run_rule.mjs`, `semantics_check.mjs`, `engine_probes.py` |
 | `tests/` | the 83 semantics cases and their C#, Python, C++ and C targets, the recorded probe results |
 | `docs/` | `RESULTS.md`, the feasibility investigation and the gap table of the 2023 packages |

@@ -1,6 +1,6 @@
 #!/bin/sh
 # Copies the artifacts produced by build.sh (out/) into dist/ under versioned names, removes the previous
-# engine files and regenerates SHA256SUMS via checksums.sh (which also covers the three loader files that ship in dist/). Usage: sh build/install.sh [TAG]
+# engine files, flattens deep array literals (flatten_literals.mjs, needs `npm install`) and regenerates SHA256SUMS via checksums.sh (which also covers the three loader files that ship in dist/). Usage: sh build/install.sh [TAG]
 set -eu
 cd "$(dirname "$0")"
 TAG="${1:-1.81.0}"
@@ -16,5 +16,8 @@ for lang in csharp python cpp; do
   cp "out/$lang/index.cjs" "$DEST/$lang-$TAG.cjs"
   cp "out/$lang/semgrep-parser.wasm" "$DEST/$lang-$TAG.wasm"
 done
+# cap the nesting of array literals so the bundles also evaluate inside a WebKit worker (see flatten_literals.mjs)
+node ./flatten_literals.mjs "$DEST"/engine-[0-9]*.mjs "$DEST"/engine-[0-9]*.cjs "$DEST"/csharp-*.mjs "$DEST"/csharp-*.cjs \
+  "$DEST"/python-*.mjs "$DEST"/python-*.cjs "$DEST"/cpp-*.mjs "$DEST"/cpp-*.cjs
 sh ./checksums.sh
 (cd "$DEST" && ls -la engine-* csharp-* python-* cpp-*)

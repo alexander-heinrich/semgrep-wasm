@@ -10,6 +10,7 @@ This directory is `dist/` of https://github.com/alexander-heinrich/Semgrep-WASM.
 | python-1.81.0.mjs / .cjs / .wasm | js/languages/python (same layout) | LGPL-2.1 |
 | cpp-1.81.0.mjs / .cjs / .wasm | js/languages/cpp (same layout; parses C++ and C) | LGPL-2.1 |
 
-The `.mjs` files and the `.wasm` side-cars are what a browser loads (`semgrep-worker.js` is a worker that does
+Each `.mjs`/`.cjs` bundle was post-processed by `build/flatten_literals.mjs` (deeply nested array literals rewritten as
+flat token lists, so the bundles evaluate inside a WebKit worker). The `.mjs` files and the `.wasm` side-cars are what a browser loads (`semgrep-worker.js` is a worker that does
 so); the `.cjs` files are for Node (`engine-node.mjs`); `engine-output.js` converts the engine's CLI-shaped JSON
 for both. SHA256SUMS covers all of it. Build notes and the comparison with the current CLI: docs/RESULTS.md.
